@@ -2,15 +2,65 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulador DEBUG 8086 · Assembler de MS-DOS en el navegador</title>
+    <meta
+      name="description"
+      content="Simulador del DEBUG de MS-DOS en el navegador: escribe instrucciones assembler 8086, ejecútalas paso a paso y observa registros, banderas, memoria y pila."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://bug.mikell.com.ar/" />
+    <meta name="theme-color" content="#050607" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Vista previa al compartir el enlace -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Simulador DEBUG 8086" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:url" content="https://bug.mikell.com.ar/" />
+    <meta property="og:title" content="Simulador DEBUG 8086 · Assembler de MS-DOS en el navegador" />
+    <meta
+      property="og:description"
+      content="Escribe instrucciones assembler 8086, ejecútalas paso a paso y observa registros, banderas, memoria y pila, como en el DEBUG de MS-DOS."
+    />
+    <meta property="og:image" content="https://bug.mikell.com.ar/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Terminal de DEBUG con un programa ejecutado paso a paso y el panel de registros, banderas, memoria y pila" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Simulador DEBUG 8086",
+        "url": "https://bug.mikell.com.ar/",
+        "description": "Simulador del programa DEBUG de MS-DOS: ensambla instrucciones del 8086, ejecútalas paso a paso y observa registros, banderas, memoria y pila.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Cualquiera con un navegador web",
+        "browserRequirements": "Requiere JavaScript",
+        "inLanguage": "es",
+        "isAccessibleForFree": true,
+        "image": "https://bug.mikell.com.ar/og-image.png",
+        "screenshot": "https://bug.mikell.com.ar/og-image.png"
+      }
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
-    <title>DEBUG 8086</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>Simulador DEBUG 8086</h1>
+      <p>
+        Simulador del programa DEBUG de MS-DOS: escribe instrucciones assembler 8086 con el comando
+        <code>a</code>, ejecútalas paso a paso con <code>t</code> o de corrido con <code>g</code>, y observa
+        cómo cambian los registros, las banderas, la memoria y la pila.
+      </p>
+      <p>Para usarlo es necesario activar JavaScript.</p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
