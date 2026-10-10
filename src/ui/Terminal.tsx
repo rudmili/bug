@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode, SubmitEvent } from 'react';
 import type { TerminalLine } from '../debug/types';
+import { TerminalHint } from './TerminalHint';
 
 interface TerminalProps {
   lines: TerminalLine[];
@@ -57,6 +58,8 @@ export function Terminal({ lines, prompt, onSubmit, children }: TerminalProps) {
     <main className="term" onClick={focusInput}>
       {children}
       <div className="term__out" ref={outRef} role="log" aria-live="polite" aria-label="Salida de DEBUG">
+        {/* Con la terminal vacía (al abrir y tras `q`) se muestra la guía de comandos */}
+        {lines.length === 0 && <TerminalHint />}
         {lines.map((line) => (
           <div key={line.id} className={`term__line term__line--${line.kind}`}>
             {line.text === '' ? ' ' : line.text}

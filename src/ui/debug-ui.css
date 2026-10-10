@@ -358,3 +358,38 @@ body {
   /* Justo a la izquierda del panel flotante, alineada con su borde superior */
   .info--float { top: var(--panel-inset); right: calc(var(--panel-width) + var(--panel-inset) * 2); }
 }
+
+/* ============================== GUÍA CON LA TERMINAL VACÍA ============================== */
+/* margin: auto la centra dentro de .term__out (anula el margin-top: auto del primer hijo) */
+.term__out > .hint { margin: auto; }
+.hint {
+  width: min(520px, 100%);
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  white-space: normal;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  user-select: none;
+}
+.hint p, .hint dl, .hint dd { margin: 0; }
+.hint__head { display: flex; flex-direction: column; gap: 4px; }
+.hint__title { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.12em; }
+.hint__lead { font-size: 13px; color: var(--dim); }
+.hint__cmds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; }
+.hint__cmd { display: flex; gap: 12px; min-width: 0; }
+.hint__key { flex-shrink: 0; font-family: var(--font-mono); color: var(--cmd); opacity: 0.75; }
+.hint__cmd .hint__key { width: 16px; }
+.hint__foot { color: var(--dim); }
+
+@media (min-width: 768px) {
+  .hint { gap: 20px; font-size: 13px; }
+  .hint__title { font-size: 13px; }
+  .hint__lead { font-size: 14px; }
+  .hint__cmds { gap: 8px 32px; }
+  .hint__cmd .hint__key { width: 56px; }
+  .hint__foot { font-size: 12px; }
+}
