@@ -1,0 +1,46 @@
+/* Simulador DEBUG 8086 · tokens de diseño (solo modo oscuro) */
+
+:root {
+  color-scheme: dark;
+
+  /* Superficies, de más oscura a más clara. No se usan bordes: las zonas se separan por tono. */
+  --bg: #050607;          /* fondo de la terminal y de la página */
+  --panel: #0b0d10;       /* fondo del panel de estado */
+  --cell: #111417;        /* celdas de banderas, pista de la barra de pila */
+  --tab-on: #1c2228;      /* pestaña activa (móvil) */
+
+  /* Texto */
+  --text: #d8dfe6;        /* texto principal y bytes distintos de cero */
+  --muted: #8b97a3;       /* títulos de sección, direcciones, leyendas */
+  --dim: #7a8794;         /* bytes en cero, posiciones libres de la pila */
+
+  /* Acentos */
+  --cmd: #5cc8d6;         /* comandos escritos, prompt, marca de CS:IP y de SP */
+  --ptr-bg: #0d2b31;      /* fondo de la fila de SP en la pila */
+  --ptr-text: #8fdde8;    /* texto de la fila de SP */
+  --hot-bg: #2a1f06;      /* fondo de "cambió en el último comando" */
+  --hot-text: #f6c765;    /* texto de "cambió en el último comando" */
+
+  /* Tipografía */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Radios. Sin bordes ni sombras. */
+  --radius-sm: 2px;       /* celdas */
+  --radius-md: 4px;       /* pestañas */
+  --radius-lg: 6px;       /* panel flotante */
+
+  /* Medidas del panel flotante (lg en adelante) */
+  --panel-width: 340px;
+  --panel-inset: 12px;
+}
+
+/*
+  Breakpoints (los de Tailwind). Las media queries no aceptan variables,
+  así que van escritos a mano en debug-ui.css:
+
+    base   < 768 px   móvil: panel con pestañas arriba, terminal debajo
+    md    >= 768 px   tableta: panel en franja de dos columnas arriba, terminal debajo
+    lg    >= 1024 px  escritorio: terminal a pantalla completa, panel flotando a la derecha
+    xl    >= 1280 px  igual que lg (solo hay más aire para la terminal)
+*/

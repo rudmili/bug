@@ -1,0 +1,297 @@
+/* Simulador DEBUG 8086 · estilos de la interfaz. Mobile first. Requiere tokens.css. */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+/* ---------- Contenedor: ocupa exactamente el viewport, sin scroll de página ---------- */
+.app {
+  position: relative;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ============================== TERMINAL ============================== */
+.term {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.term__out {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 4px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;            /* 63 columnas de DEBUG en 390 px sin scroll horizontal */
+  line-height: 1.55;
+  white-space: pre;
+}
+/* El historial se apoya abajo, como en una terminal real */
+.term__out > :first-child { margin-top: auto; }
+
+.term__line--command { color: var(--cmd); }
+.term__line--error { color: var(--text); }
+
+.term__input-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin: 0;
+  padding: 0 12px 8px;
+}
+.term__prompt {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cmd);
+  white-space: pre;
+}
+.term__input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  caret-color: var(--cmd);
+  font-family: var(--font-mono);
+  font-size: 16px;             /* 16 px evita el zoom automático de iOS al enfocar */
+}
+.term__input::placeholder { color: var(--dim); }
+
+/* ============================== PANEL ============================== */
+.panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 12px 12px;
+  background: var(--panel);
+}
+
+/* Pestañas: solo en móvil */
+.panel__tabs { display: flex; gap: 4px; }
+.panel__tab {
+  flex: 1 1 0;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.panel__tab[aria-pressed='true'] { background: var(--tab-on); color: var(--text); }
+.panel__tab:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
+
+/* En móvil las columnas no existen: sus hijos pasan a ser hijos del panel */
+.panel__col { display: contents; }
+
+/* En móvil solo se ve la sección de la pestaña activa */
+@media (max-width: 767.98px) {
+  .panel[data-active='reg'] .sec:not([data-tab='reg']),
+  .panel[data-active='mem'] .sec:not([data-tab='mem']),
+  .panel[data-active='pila'] .sec:not([data-tab='pila']) { display: none; }
+}
+
+/* ---------- Sección genérica ---------- */
+.sec { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sec__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sec__title {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sec__meta { font-size: 11px; color: var(--muted); }
+.sec__meta-value { font-family: var(--font-mono); }
+.sec__meta-value--hot { color: var(--hot-text); }
+/* En móvil la pestaña ya nombra estas secciones */
+.sec--plain .sec__head { display: none; }
+
+/* ---------- Registros ---------- */
+.regs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 6px; }
+.reg {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text);
+}
+.reg__name { opacity: 0.7; }
+.reg--hot { background: var(--hot-bg); color: var(--hot-text); }
+
+/* ---------- Banderas ---------- */
+.flags { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.flag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  border-radius: var(--radius-sm);
+  background: var(--cell);
+  color: var(--text);
+}
+.flag__code { font-family: var(--font-mono); font-size: 13px; font-weight: 700; line-height: 17px; }
+.flag__label { font-size: 9.5px; line-height: 13px; opacity: 0.8; }
+.flag--hot { background: var(--hot-bg); color: var(--hot-text); }
+
+/* ---------- Ventana de memoria ---------- */
+.mem {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 17px;
+}
+.mem__row {
+  display: grid;
+  grid-template-columns: 38px repeat(16, minmax(0, 1fr));
+  align-items: center;
+}
+/* En móvil se muestran 4 filas (64 bytes); desde md, las 8 */
+.mem__row:nth-child(n + 5) { display: none; }
+.mem__addr { color: var(--muted); }
+.byte { text-align: center; color: var(--dim); }
+.byte--set { color: var(--text); }
+.byte--ip { box-shadow: inset 0 -2px 0 var(--cmd); }
+.byte--hot { background: var(--hot-bg); color: var(--hot-text); border-radius: var(--radius-sm); }
+
+/* ---------- Pila ---------- */
+.stack__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 22px;
+}
+.stack__row {
+  display: grid;
+  grid-template-columns: 34px 48px 48px 1fr;
+  align-items: center;
+  color: var(--dim);
+}
+.stack__tag { text-align: center; font-size: 11px; font-weight: 700; }
+.stack__note { font-family: var(--font-ui); font-size: 12px; }
+.stack__row--sp { border-radius: var(--radius-sm); background: var(--ptr-bg); color: var(--ptr-text); }
+.stack__row--sp .stack__value { color: var(--text); }
+
+.stack__range { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
+.stack__bar { position: relative; height: 6px; border-radius: 3px; background: var(--cell); }
+/* --pos va de 0 (SP en el inicio) a 1 (SP en el límite). Lo fija StackView. */
+.stack__mark {
+  position: absolute;
+  top: -3px;
+  left: calc(var(--pos, 0) * (100% - 3px));
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--cmd);
+}
+.stack__legend { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.stack__legend b { font-family: var(--font-mono); font-weight: 400; color: var(--text); }
+
+/* ============================== md >= 768 px ============================== */
+@media (min-width: 768px) {
+  .term__out { padding: 16px 16px 6px; font-size: 13px; line-height: 1.45; }
+  .term__input-row { padding: 0 16px 8px; }
+  .term__prompt, .term__input { font-size: 14px; }
+
+  /* Panel: franja de dos columnas, todo visible, sin pestañas */
+  .panel {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 20px;
+    padding: 12px 16px;
+  }
+  .panel__tabs { display: none; }
+  .panel__col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .sec--plain .sec__head { display: flex; }
+  .panel__col--b .sec { flex: 1 1 0; }
+
+  .reg { padding: 1px 5px; font-size: 12px; }
+  .flag { padding: 3px 0; }
+  .flag__code { font-size: 12px; line-height: 16px; }
+  .flag__label { font-size: 9px; }
+
+  .mem { flex: 1 1 0; line-height: 15px; }
+  .mem__row { flex: 1 1 0; grid-template-columns: 40px repeat(16, minmax(0, 1fr)); }
+  .mem__row:nth-child(n + 5) { display: grid; }
+
+  .stack__rows { font-size: 12px; line-height: 18px; }
+  .stack__row { grid-template-columns: 30px 44px 44px 1fr; }
+  .stack__note { font-size: 11px; }
+  .stack__range { padding-top: 6px; }
+}
+
+/* ============================== lg >= 1024 px ============================== */
+@media (min-width: 1024px) {
+  /* La terminal ocupa todo el viewport; el panel flota encima, a la derecha y a todo el alto */
+  .term__out {
+    padding: 16px 20px 6px;
+    /* reserva para que una línea larga no quede debajo del panel */
+    padding-right: calc(var(--panel-width) + var(--panel-inset) * 2);
+  }
+  .term__input-row { height: 36px; padding: 0 20px 10px; }
+  .term__prompt, .term__input { font-size: 13px; }
+
+  .panel {
+    position: absolute;
+    top: var(--panel-inset);
+    right: var(--panel-inset);
+    bottom: var(--panel-inset);
+    width: var(--panel-width);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 12px;
+    border-radius: var(--radius-lg);
+  }
+  /* Una sola columna: registros, banderas, código, datos, pila */
+  .panel__col { display: contents; }
+  .sec--mem { order: 3; flex: 1 1 0; min-height: 0; }
+  .sec--stack { order: 5; }
+  .panel__col--b .sec { flex: 1 1 0; }
+
+  .regs { gap: 4px 6px; }
+  .reg { padding: 5px 6px; font-size: 13px; line-height: 20px; }
+  .flag { padding: 5px 0; }
+  .flag__code { font-size: 13px; line-height: 18px; }
+  .flag__label { font-size: 9.5px; line-height: 14px; }
+
+  .mem { min-height: 0; font-size: 12px; }
+  .stack__rows { line-height: 20px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reg, .flag, .byte { transition: background-color 120ms ease-out, color 120ms ease-out; }
+}
