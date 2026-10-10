@@ -39,7 +39,9 @@ body {
   flex-direction: column;
   padding: 12px 12px 4px;
   font-family: var(--font-mono);
-  font-size: 9.5px;            /* 63 columnas de DEBUG en 390 px sin scroll horizontal */
+  /* Las 77 columnas de una línea de `d` entran sin scroll horizontal: ancho menos el padding,
+     entre 78 columnas (una de margen), entre 0.6 (avance de JetBrains Mono). Unos 7.8 px en 390 px, como máximo 9.5 px */
+  font-size: min(9.5px, calc((100vw - 24px) / 78 / 0.6));
   line-height: 1.55;
   white-space: pre;
 }
