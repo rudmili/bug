@@ -15,10 +15,6 @@ Junto a la terminal, un panel muestra el estado de la máquina después de cada 
 - **Memoria de datos**, que salta a la última dirección escrita por el programa.
 - **Pila**, con la posición de `SP`, las palabras apiladas y las posiciones libres.
 
-<p align="center">
-  <img src="screenshots/mobile.png" alt="Simulador en móvil: pestañas Registros, Memoria y Pila sobre la terminal" width="300">
-</p>
-
 En el móvil el panel se divide en pestañas; en tableta se muestra como una franja sobre la terminal.
 
 ## Comandos
