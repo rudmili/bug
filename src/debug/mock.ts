@@ -1,0 +1,118 @@
+import type {
+  ByteView,
+  DebugSession,
+  DebugView,
+  FlagView,
+  MemoryRowView,
+  RegisterView,
+  TerminalLine,
+} from './types';
+
+/**
+ * Sesión falsa para trabajar en la interfaz sin la lógica.
+ * Muestra un estado fijo (el de la traza con AX=FF00) y repite cada línea escrita.
+ */
+
+const REGISTERS: RegisterView[] = [
+  { name: 'AX', value: 'FF00', changed: true },
+  { name: 'BX', value: '0000', changed: false },
+  { name: 'CX', value: '0000', changed: false },
+  { name: 'DX', value: '0000', changed: false },
+  { name: 'SP', value: 'FFFE', changed: false },
+  { name: 'BP', value: '0000', changed: false },
+  { name: 'SI', value: '0000', changed: false },
+  { name: 'DI', value: '0000', changed: false },
+  { name: 'DS', value: '0DAB', changed: false },
+  { name: 'ES', value: '0DAB', changed: false },
+  { name: 'SS', value: '0DAB', changed: false },
+  { name: 'CS', value: '0DAB', changed: false },
+  { name: 'IP', value: '0108', changed: true },
+];
+
+const FLAGS: FlagView[] = [
+  { key: 'OF', code: 'NV', label: 'Desb.', changed: false },
+  { key: 'DF', code: 'UP', label: 'Direc.', changed: false },
+  { key: 'IF', code: 'EI', label: 'Interr.', changed: false },
+  { key: 'SF', code: 'NG', label: 'Signo', changed: false },
+  { key: 'ZF', code: 'NZ', label: 'Cero', changed: false },
+  { key: 'AF', code: 'AC', label: 'Aux.', changed: true },
+  { key: 'PF', code: 'PE', label: 'Paridad', changed: true },
+  { key: 'CF', code: 'CY', label: 'Acarreo', changed: true },
+];
+
+const PROGRAM = [0xb4, 0x08, 0x80, 0xc4, 0x03, 0x80, 0xec, 0x0c, 0x88, 0x26, 0x00, 0x20];
+
+function rows(start: number, fill: (offset: number) => ByteView): MemoryRowView[] {
+  return Array.from({ length: 8 }, (_, r) => {
+    const base = start + r * 16;
+    return {
+      address: base.toString(16).toUpperCase().padStart(4, '0'),
+      bytes: Array.from({ length: 16 }, (_, i) => fill(base + i)),
+    };
+  });
+}
+
+function byte(value: number, extra: Partial<ByteView> = {}): ByteView {
+  return {
+    value: value.toString(16).toUpperCase().padStart(2, '0'),
+    nonZero: value !== 0,
+    changed: false,
+    isIp: false,
+    ...extra,
+  };
+}
+
+function baseView(lines: TerminalLine[]): DebugView {
+  return {
+    lines,
+    prompt: '-',
+    registers: REGISTERS,
+    flags: FLAGS,
+    code: {
+      title: 'Memoria · código',
+      caption: 'sigue a CS:IP',
+      captionValue: '0100',
+      captionHot: false,
+      rows: rows(0x100, (o) => byte(PROGRAM[o - 0x100] ?? 0, { isIp: o === 0x108 })),
+    },
+    data: {
+      title: 'Memoria · datos',
+      caption: 'última escritura',
+      captionValue: '[2000]',
+      captionHot: false,
+      rows: rows(0x2000, () => byte(0)),
+    },
+    stack: {
+      pointer: 'SS:SP 0DAB:FFFE',
+      rows: [
+        { address: 'FFFE', value: '0000', isSp: true, note: 'tope · retorno a DOS' },
+        { address: 'FFFC', value: '0000', isSp: false, note: 'libre · próximo push' },
+        { address: 'FFFA', value: '0000', isSp: false, note: 'libre' },
+        { address: 'FFF8', value: '0000', isSp: false, note: 'libre' },
+      ],
+      start: 'FFFE',
+      limit: '010C',
+      usedBytes: 0,
+      totalBytes: 0xfffe - 0x010c,
+      position: 0,
+    },
+  };
+}
+
+export function createMockSession(): DebugSession {
+  let nextId = 0;
+  let view = baseView([
+    { id: nextId++, kind: 'command', text: '-r' },
+    { id: nextId++, kind: 'output', text: 'AX=FF00 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000' },
+    { id: nextId++, kind: 'output', text: 'DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0108 NV UP EI NG NZ AC PE CY' },
+    { id: nextId++, kind: 'output', text: '0DAB:0108 88260020      MOV     [2000],AH                    DS:2000=00' },
+  ]);
+
+  return {
+    getView: () => view,
+    submit(line) {
+      view = { ...view, lines: [...view.lines, { id: nextId++, kind: 'command', text: view.prompt + line }] };
+      return view;
+    },
+  };
+}
