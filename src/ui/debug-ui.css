@@ -290,12 +290,17 @@ body {
     gap: 16px;
     padding: 12px;
     border-radius: var(--radius-lg);
+    /* En pantallas bajas el contenido no entra: el panel hace scroll en vez de encimar secciones */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
   /* Una sola columna: registros, banderas, código, datos, pila */
   .panel__col { display: contents; }
-  .sec--mem { order: 3; flex: 1 1 0; min-height: 0; }
+  /* Las ventanas de memoria reparten el alto que sobra, pero nunca se achican por debajo de sus 8 filas */
+  .sec--mem { order: 3; flex: 1 0 auto; }
   .sec--stack { order: 5; }
-  .panel__col--b .sec { flex: 1 1 0; }
+  .panel__col--b .sec { flex: 1 0 auto; }
 
   .regs { gap: 4px 6px; }
   .reg { padding: 5px 6px; font-size: 13px; line-height: 20px; }
@@ -303,7 +308,7 @@ body {
   .flag__code { font-size: 13px; line-height: 18px; }
   .flag__label { font-size: 9.5px; line-height: 14px; }
 
-  .mem { min-height: 0; font-size: 12px; }
+  .mem { font-size: 12px; }
   .stack__rows { line-height: 20px; }
 }
 
