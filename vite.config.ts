@@ -18,10 +18,15 @@ function commitId() {
 }
 
 // Versión SemVer con el commit como metadato de build: 1.0.0+5ea9401
-const appVersion = `${version}+${commitId()}`
+const commit = commitId()
+const appVersion = `${version}+${commit}`
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __APP_COMMIT__: JSON.stringify(commit),
+  },
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),

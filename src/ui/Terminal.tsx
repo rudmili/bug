@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, SubmitEvent } from 'react';
+import type { KeyboardEvent, ReactNode, SubmitEvent } from 'react';
 import type { TerminalLine } from '../debug/types';
 
 interface TerminalProps {
@@ -7,9 +7,11 @@ interface TerminalProps {
   prompt: string;
   /** Se llama con la línea tal cual, también cuando está vacía (una línea vacía sale del modo ensamblado). */
   onSubmit: (line: string) => void;
+  /** Contenido que flota sobre la salida (la versión y el enlace al repositorio). */
+  children?: ReactNode;
 }
 
-export function Terminal({ lines, prompt, onSubmit }: TerminalProps) {
+export function Terminal({ lines, prompt, onSubmit, children }: TerminalProps) {
   const [value, setValue] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -53,6 +55,7 @@ export function Terminal({ lines, prompt, onSubmit }: TerminalProps) {
 
   return (
     <main className="term" onClick={focusInput}>
+      {children}
       <div className="term__out" ref={outRef} role="log" aria-live="polite" aria-label="Salida de DEBUG">
         {lines.map((line) => (
           <div key={line.id} className={`term__line term__line--${line.kind}`}>

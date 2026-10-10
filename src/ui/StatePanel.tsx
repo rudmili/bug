@@ -4,6 +4,7 @@ import { Registers } from './Registers';
 import { Flags } from './Flags';
 import { MemoryWindow } from './MemoryWindow';
 import { StackView } from './StackView';
+import { AppInfo } from './AppInfo';
 
 type Tab = 'reg' | 'mem' | 'pila';
 
@@ -38,6 +39,7 @@ export function StatePanel({ view }: { view: PanelView }) {
             {t.label}
           </button>
         ))}
+        <AppInfo className="info--tabs" />
       </div>
       <div className="panel__col panel__col--a">
         <Registers registers={view.registers} />

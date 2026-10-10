@@ -4,6 +4,7 @@ import './debug-ui.css';
 import type { DebugSession } from '../debug/types';
 import { Terminal } from './Terminal';
 import { StatePanel } from './StatePanel';
+import { AppInfo } from './AppInfo';
 
 /**
  * Composición de la pantalla. Recibe la sesión ya creada:
@@ -18,7 +19,9 @@ export function App({ session }: { session: DebugSession }) {
       {/* Título de la página para lectores de pantalla y buscadores; la terminal ya lo deja claro a la vista */}
       <h1 className="sr-only">Simulador DEBUG 8086</h1>
       <StatePanel view={view} />
-      <Terminal lines={view.lines} prompt={view.prompt} onSubmit={(line) => setView(session.submit(line))} />
+      <Terminal lines={view.lines} prompt={view.prompt} onSubmit={(line) => setView(session.submit(line))}>
+        <AppInfo className="info--float" />
+      </Terminal>
     </div>
   );
 }

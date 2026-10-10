@@ -315,3 +315,46 @@ body {
 @media (prefers-reduced-motion: no-preference) {
   .reg, .flag, .byte { transition: background-color 120ms ease-out, color 120ms ease-out; }
 }
+
+/* ============================== VERSIÓN Y REPOSITORIO ============================== */
+.info { display: flex; align-items: center; gap: 2px; }
+.info a { color: var(--text); text-decoration: none; }
+.info a:hover { color: var(--cmd); }
+.info a:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; border-radius: var(--radius-md); }
+.info__version { font-family: var(--font-mono); font-size: 10px; white-space: nowrap; }
+.info__commit { color: var(--muted); }
+.info__repo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+}
+
+/* Móvil: al final de la fila de pestañas (que desaparece desde md) */
+.info--tabs { flex-shrink: 0; padding-left: 4px; }
+
+/* Tableta y escritorio: flota arriba a la derecha de la terminal */
+.info--float { display: none; }
+
+@media (min-width: 768px) {
+  .term { position: relative; }
+  .info--float {
+    display: flex;
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 1;
+    padding: 2px 2px 2px 12px;
+    border-radius: var(--radius-lg);
+    background: var(--cell);
+  }
+  .info--float .info__version { font-size: 12px; }
+  .info--float .info__repo { width: 36px; height: 36px; }
+}
+
+@media (min-width: 1024px) {
+  /* Justo a la izquierda del panel flotante, alineada con su borde superior */
+  .info--float { top: var(--panel-inset); right: calc(var(--panel-width) + var(--panel-inset) * 2); }
+}
