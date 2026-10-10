@@ -15,6 +15,8 @@ export function App({ session }: { session: DebugSession }) {
 
   return (
     <div className="app">
+      {/* Título de la página para lectores de pantalla y buscadores; la terminal ya lo deja claro a la vista */}
+      <h1 className="sr-only">Simulador DEBUG 8086</h1>
       <StatePanel view={view} />
       <Terminal lines={view.lines} prompt={view.prompt} onSubmit={(line) => setView(session.submit(line))} />
     </div>
