@@ -93,3 +93,11 @@ docs/      especificación original y diseño de referencia
 ```
 
 La interfaz y la lógica se comunican solo a través de `src/debug/types.ts`: la lógica produce un `DebugView` después de cada línea, y la interfaz lo dibuja.
+
+## Licencia
+
+Copyright (C) 2026 Mikell Bobadila
+
+Este proyecto se distribuye bajo la [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). Puedes usarlo, modificarlo y redistribuirlo, pero cualquier versión modificada, incluida una que se ofrezca como servicio web, debe publicarse con su código fuente bajo la misma licencia.
+
+Si quieres usarlo bajo otras condiciones, por ejemplo en un producto cerrado, escríbeme para hablar de una licencia comercial.
