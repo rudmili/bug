@@ -180,6 +180,8 @@ body {
   justify-content: space-between;
   padding: 3px 5px;
   border-radius: var(--radius-sm);
+  /* Mismo fondo que las celdas de banderas: separa cada registro sin usar bordes */
+  background: var(--cell);
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 18px;
