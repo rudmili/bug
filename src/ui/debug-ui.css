@@ -203,6 +203,63 @@ body {
 .flag__label { font-size: 9.5px; line-height: 13px; opacity: 0.8; }
 .flag--hot { background: var(--hot-bg); color: var(--hot-text); }
 
+/* ---------- Popup de registros y banderas: con el cursor encima o con foco (teclado o toque) ---------- */
+.reg, .flag { position: relative; cursor: help; }
+.reg:focus-visible,
+.flag:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
+.tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 3;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border-radius: var(--radius-md);
+  background: var(--tab-on);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%);
+}
+/* Los de los extremos se alinean al borde para no salirse del panel */
+.reg:nth-child(4n + 1) .tip,
+.flag:nth-child(-n + 2) .tip { left: 0; transform: none; }
+.reg:nth-child(4n) .tip,
+.flag:nth-last-child(-n + 2) .tip { left: auto; right: 0; transform: none; }
+.reg:hover .tip, .reg:focus .tip,
+.flag:hover .tip, .flag:focus .tip { opacity: 1; visibility: visible; }
+.tip__title { color: var(--text); font-size: 12px; }
+.tip__title b { color: var(--cmd); font-weight: 600; }
+.tip__code { font-family: var(--font-mono); color: var(--muted); }
+
+/* Registros: parte alta y baja, resaltada la que tiene datos */
+.tip__bytes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 4px 0 2px; }
+.tip__byte {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--dim);
+}
+.tip__byte-name { font-size: 10px; }
+.tip__byte-value { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+.tip__byte--set { background: var(--ptr-bg); color: var(--ptr-text); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tip { transition: opacity 120ms ease-out, visibility 120ms ease-out; }
+}
+
 /* ---------- Ventana de memoria ---------- */
 .mem {
   display: flex;
