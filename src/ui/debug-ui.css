@@ -25,6 +25,30 @@ body {
   border: 0;
 }
 
+/* ---------- Barras de scroll (terminal y panel) con los tonos de la paleta ---------- */
+/* Chrome, Edge y Safari: pulgar redondeado, sin flechas. Si se fija scrollbar-width/-color,
+   Chrome ignora estos pseudoelementos, por eso esas propiedades van solo para Firefox. */
+.term__out::-webkit-scrollbar,
+.panel::-webkit-scrollbar { width: 12px; height: 12px; }
+.term__out::-webkit-scrollbar-track,
+.panel::-webkit-scrollbar-track { background: transparent; }
+.term__out::-webkit-scrollbar-thumb,
+.panel::-webkit-scrollbar-thumb {
+  /* El borde transparente separa el pulgar del canto y lo deja más fino */
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--tab-on) padding-box;
+}
+.term__out::-webkit-scrollbar-thumb:hover,
+.panel::-webkit-scrollbar-thumb:hover { background-color: var(--dim); }
+.term__out::-webkit-scrollbar-corner,
+.panel::-webkit-scrollbar-corner { background: transparent; }
+
+@supports not selector(::-webkit-scrollbar) {
+  .term__out,
+  .panel { scrollbar-width: thin; scrollbar-color: var(--tab-on) transparent; }
+}
+
 /* ---------- Contenedor: ocupa exactamente el viewport, sin scroll de página ---------- */
 .app {
   position: relative;
@@ -295,7 +319,6 @@ body {
     /* En pantallas bajas el contenido no entra: el panel hace scroll en vez de encimar secciones */
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
   }
   /* Una sola columna: registros, banderas, código, datos, pila */
   .panel__col { display: contents; }
