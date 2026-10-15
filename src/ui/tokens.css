@@ -31,7 +31,8 @@
   --radius-lg: 6px;       /* panel flotante */
 
   /* Medidas del panel flotante (lg en adelante) */
-  --panel-width: 340px;
+  /* Crece con la ventana; en 1024 px se queda en 360 px para que las 77 columnas de `d` sigan entrando en la terminal */
+  --panel-width: clamp(360px, 34vw, 500px);
   --panel-inset: 12px;
 }
 
