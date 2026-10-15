@@ -285,6 +285,8 @@ body {
     right: var(--panel-inset);
     bottom: var(--panel-inset);
     width: var(--panel-width);
+    /* .term (posicionada y posterior en el DOM) se pintaría encima y se quedaría con la rueda y la barra de scroll */
+    z-index: 2;
     display: flex;
     flex-direction: column;
     gap: 16px;
