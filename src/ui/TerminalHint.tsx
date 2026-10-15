@@ -7,6 +7,7 @@ const COMMANDS = [
   { cmd: 'd', desc: 'Muestra la memoria' },
   { cmd: 'e', desc: 'Escribe en memoria' },
   { cmd: 'q', desc: 'Reinicia la máquina' },
+  { cmd: 'man', desc: 'Explica un comando' },
 ];
 
 /** Guía de comandos que ocupa la terminal mientras no hay nada escrito. */
@@ -28,7 +29,8 @@ export function TerminalHint() {
       <p className="hint__foot">
         Los números van en hexadecimal. Las flechas ↑ ↓ recorren lo que ya escribiste.
         <br />
-        Para empezar, prueba <code className="hint__key">a 100</code>.
+        Para empezar, prueba <code className="hint__key">a 100</code>. Para saber qué hace un comando,{' '}
+        <code className="hint__key">man a</code>.
       </p>
     </div>
   );

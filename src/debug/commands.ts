@@ -6,6 +6,7 @@ import { Output, handleInterrupt } from './dos';
 import { effectiveOffset, step } from './executor';
 import { flagsText } from './flags';
 import { hex2, hex4, parseHex } from './hex';
+import { manual } from './manual';
 import { readByte, readWord, writeByte } from './memory';
 import { CS, DS, REG16, SREG } from './state';
 import type { Machine } from './state';
@@ -411,6 +412,11 @@ function runCommand(m: Machine, state: CommandState, line: string): RunResult {
   const lead = line.length - line.trimStart().length;
   const text = line.trimStart();
   if (text === '') return { output: [] };
+  // `man` no es de DEBUG: es la ayuda del simulador. DEBUG no tiene comandos de varias letras, así que no choca
+  if (/^man(\s|$)/i.test(text)) {
+    const { ok, lines } = manual(text.slice(3));
+    return { output: lines.map((l) => (ok ? out(l) : { kind: 'error', text: l })) };
+  }
   const cmd = text[0].toLowerCase();
   const argsCol = lead + 1;
   const argsText = text.slice(1);

@@ -243,3 +243,45 @@ describe('commands: otros', () => {
     expect(run(s.m, s.state, 'e 400 1').dataFocus).toBe(0x400);
   });
 });
+
+describe('commands: man', () => {
+  it('man a explica el comando a', () => {
+    const lines = session().type('man a');
+    expect(lines[0]).toBe('NOMBRE');
+    expect(lines[1]).toContain('a - ensambla instrucciones');
+    expect(lines).toContain('SINOPSIS');
+    expect(lines).toContain('DESCRIPCIÓN');
+    expect(lines).toContain('EJEMPLOS');
+  });
+
+  it('acepta mayúsculas y espacios', () => {
+    expect(session().type('  MAN   D ')[1]).toContain('d - muestra la memoria');
+  });
+
+  it('sin argumentos lista las páginas', () => {
+    const lines = session().type('man');
+    for (const c of ['a', 'u', 't', 'g', 'r', 'd', 'e', 'q', 'man']) {
+      expect(lines.some((l) => l.trim().startsWith(`${c} - `))).toBe(true);
+    }
+  });
+
+  it('avisa si no hay página', () => {
+    expect(session().type('man z')).toEqual(['No hay entrada de manual para z']);
+  });
+
+  it('no cambia de modo ni toca la máquina', () => {
+    const s = session();
+    s.type('man r');
+    expect(s.prompt()).toBe('-');
+  });
+
+  it('todas las líneas entran en 77 columnas', () => {
+    const s = session();
+    const all = ['', 'a', 'u', 't', 'g', 'r', 'd', 'e', 'q', 'man'].flatMap((c) => s.type(`man ${c}`));
+    for (const l of all) expect(l.length).toBeLessThanOrEqual(77);
+  });
+
+  it('una m sola sigue siendo un error', () => {
+    expect(session().type('m')).toEqual([' ^ Error']);
+  });
+});

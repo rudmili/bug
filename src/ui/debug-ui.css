@@ -466,7 +466,7 @@ body {
 .hint__cmds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; }
 .hint__cmd { display: flex; gap: 12px; min-width: 0; }
 .hint__key { flex-shrink: 0; font-family: var(--font-mono); color: var(--cmd); opacity: 0.75; }
-.hint__cmd .hint__key { width: 16px; }
+.hint__cmd .hint__key { width: 40px; }   /* entran "man" y "clear" */
 .hint__foot { color: var(--dim); }
 
 @media (min-width: 768px) {
