@@ -8,13 +8,14 @@ interface TerminalProps {
   prompt: string;
   /** Se llama con la línea tal cual, también cuando está vacía (una línea vacía sale del modo ensamblado). */
   onSubmit: (line: string) => void;
+  /** Líneas ya escritas que recorren las flechas ↑ ↓ (vienen del registro persistido). */
+  history: string[];
   /** Contenido que flota sobre la salida (la versión y el enlace al repositorio). */
   children?: ReactNode;
 }
 
-export function Terminal({ lines, prompt, onSubmit, children }: TerminalProps) {
+export function Terminal({ lines, prompt, onSubmit, history, children }: TerminalProps) {
   const [value, setValue] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const outRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -28,7 +29,6 @@ export function Terminal({ lines, prompt, onSubmit, children }: TerminalProps) {
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit(value);
-    if (value.trim() !== '') setHistory((h) => [...h, value]);
     setCursor(null);
     setValue('');
   }

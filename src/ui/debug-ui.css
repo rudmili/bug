@@ -423,7 +423,6 @@ body {
 .info--float { display: none; }
 
 @media (min-width: 768px) {
-  .term { position: relative; }
   .info--float {
     display: flex;
     position: absolute;
@@ -441,6 +440,47 @@ body {
 @media (min-width: 1024px) {
   /* Justo a la izquierda del panel flotante, alineada con su borde superior */
   .info--float { top: var(--panel-inset); right: calc(var(--panel-width) + var(--panel-inset) * 2); }
+}
+
+/* ============================== BOTÓN REINICIAR ============================== */
+/* Flota abajo a la derecha de la salida, justo encima de la línea de comandos */
+.term { position: relative; }
+/* Hueco bajo la última línea para que el botón no la tape (las líneas de `d` ocupan todo el ancho en móvil) */
+.term__out::after { content: ''; flex-shrink: 0; height: 44px; }
+.reset {
+  position: absolute;
+  right: 12px;
+  bottom: 52px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--cell);
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.reset:hover:not(:disabled) { background: var(--tab-on); color: var(--text); }
+.reset:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
+.reset:disabled { opacity: 0.4; cursor: default; }
+
+@media (min-width: 768px) {
+  .reset { right: 16px; }
+}
+
+@media (min-width: 1024px) {
+  /* A la izquierda del panel flotante, como la versión */
+  .reset { right: calc(var(--panel-width) + var(--panel-inset) * 2); bottom: 50px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .reset { transition: background-color 120ms ease-out, color 120ms ease-out; }
 }
 
 /* ============================== GUÍA CON LA TERMINAL VACÍA ============================== */

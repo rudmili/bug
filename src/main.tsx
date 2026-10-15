@@ -3,11 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { App } from './ui/App'
 import { createDebugSession } from './debug/session'
 
-// Se crea una sola vez, fuera del render: StrictMode y el React Compiler pueden renderizar dos veces
-const session = createDebugSession()
-
+// App crea la sesión y le vuelve a ejecutar los comandos guardados; al reiniciar crea otra
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App session={session} />
+    <App createSession={createDebugSession} />
   </StrictMode>,
 )
