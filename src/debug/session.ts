@@ -58,7 +58,8 @@ export function createDebugSession(): DebugSession {
         return view;
       }
       const added = result.output.map((o): TerminalLine => ({ id: nextId++, kind: o.kind, text: o.text }));
-      lines = [...lines, echo, ...added].slice(-MAX_LINES);
+      // `clear` deja la terminal vacía (vuelve a verse la guía de comandos), sin el eco de la línea
+      lines = result.clear ? [] : [...lines, echo, ...added].slice(-MAX_LINES);
       view = render(prev, result.dataFocus);
       return view;
     },

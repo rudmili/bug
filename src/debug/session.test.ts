@@ -62,3 +62,22 @@ describe('session', () => {
     expect(s.getView().lines).toHaveLength(MAX_LINES);
   });
 });
+
+describe('session: clear', () => {
+  it('vacía la terminal y conserva la máquina', () => {
+    const s = createDebugSession();
+    s.submit('r ax');
+    s.submit('1234');
+    const v = s.submit('clear');
+    expect(v.lines).toEqual([]);
+    expect(v.prompt).toBe('-');
+    expect(v.registers.find((r) => r.name === 'AX')?.value).toBe('1234');
+  });
+
+  it('con argumentos es un error y no borra nada', () => {
+    const s = createDebugSession();
+    s.submit('r');
+    const v = s.submit('clear x');
+    expect(v.lines.at(-1)).toMatchObject({ kind: 'error', text: '       ^ Error' });
+  });
+});

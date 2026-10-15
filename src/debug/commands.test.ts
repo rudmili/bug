@@ -277,7 +277,7 @@ describe('commands: man', () => {
 
   it('todas las líneas entran en 77 columnas', () => {
     const s = session();
-    const all = ['', 'a', 'u', 't', 'g', 'r', 'd', 'e', 'q', 'man'].flatMap((c) => s.type(`man ${c}`));
+    const all = ['', 'a', 'u', 't', 'g', 'r', 'd', 'e', 'q', 'clear', 'man'].flatMap((c) => s.type(`man ${c}`));
     for (const l of all) expect(l.length).toBeLessThanOrEqual(77);
   });
 

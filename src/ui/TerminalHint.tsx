@@ -8,6 +8,7 @@ const COMMANDS = [
   { cmd: 'e', desc: 'Escribe en memoria' },
   { cmd: 'q', desc: 'Reinicia la máquina' },
   { cmd: 'man', desc: 'Explica un comando' },
+  { cmd: 'clear', desc: 'Limpia la terminal' },
 ];
 
 /** Guía de comandos que ocupa la terminal mientras no hay nada escrito. */

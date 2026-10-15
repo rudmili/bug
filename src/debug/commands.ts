@@ -50,6 +50,8 @@ export interface RunResult {
   output: OutLine[];
   /** `q`: la sesión vuelve al estado inicial. */
   reset?: boolean;
+  /** `clear`: borra la terminal sin tocar la máquina. */
+  clear?: boolean;
   /** Desplazamiento en DS que muestra `d` o edita `e`: la ventana de datos se mueve ahí. */
   dataFocus?: number;
 }
@@ -416,6 +418,12 @@ function runCommand(m: Machine, state: CommandState, line: string): RunResult {
   if (/^man(\s|$)/i.test(text)) {
     const { ok, lines } = manual(text.slice(3));
     return { output: lines.map((l) => (ok ? out(l) : { kind: 'error', text: l })) };
+  }
+  // `clear`, como en Linux: limpia la pantalla y conserva memoria y registros (a diferencia de `q`)
+  if (/^clear(\s|$)/i.test(text)) {
+    const extra = tokenize(text.slice(5), lead + 5);
+    if (extra.length > 0) throw new CommandError(extra[0].col);
+    return { output: [], clear: true };
   }
   const cmd = text[0].toLowerCase();
   const argsCol = lead + 1;

@@ -144,6 +144,15 @@ const PAGES: Record<string, ManPage> = {
     ],
     examples: ['q'],
   },
+  clear: {
+    name: 'clear - limpia la terminal',
+    synopsis: ['clear'],
+    description: [
+      'Borra todo lo escrito en la terminal, como en Linux. A diferencia de `q`,',
+      'no toca la máquina: la memoria, los registros y las banderas quedan igual.',
+    ],
+    examples: ['clear'],
+  },
   man: {
     name: 'man - muestra el manual de un comando',
     synopsis: ['man [comando]'],
