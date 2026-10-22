@@ -54,17 +54,20 @@ export interface Machine {
   writes: WriteRecord[];
 }
 
-export const INITIAL_SEGMENT = 0x0dab;
+/** Segmento donde DOS carga a DEBUG en DOSBox (CS, DS, SS y ES). */
+export const INITIAL_SEGMENT = 0x073f;
+/** SP inicial: DEBUG deja la pila dentro del PSP, debajo del programa. */
+export const INITIAL_SP = 0x00fd;
 
 export function createMachine(): Machine {
   const sregs = new Uint16Array(4).fill(INITIAL_SEGMENT);
   const regs = new Uint16Array(8);
-  regs[SP] = 0xfffe;
+  regs[SP] = INITIAL_SP;
   return {
     regs,
     sregs,
     ip: 0x0100,
-    flags: { CF: false, PF: false, AF: false, ZF: false, SF: true, TF: false, IF: true, DF: false, OF: false },
+    flags: { CF: false, PF: false, AF: false, ZF: false, SF: false, TF: false, IF: true, DF: false, OF: false },
     mem: new Uint8Array(MEMORY_SIZE),
     writes: [],
   };

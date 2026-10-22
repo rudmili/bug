@@ -18,9 +18,9 @@ describe('decoder', () => {
     expect(g && isGroup(g) && g.group[5]?.mnem).toBe('SUB');
   });
 
-  it('decodifica RET del estado inicial', () => {
-    const i = decode(bootMachine(), 0x0dab, 0x100);
-    expect(i).toMatchObject({ mnem: 'RET', operands: [], length: 1, bytes: [0xc3] });
+  it('decodifica los ceros del estado inicial como ADD [BX+SI],AL', () => {
+    const i = decode(bootMachine(), 0x073f, 0x100);
+    expect(i).toMatchObject({ mnem: 'ADD', length: 2, bytes: [0x00, 0x00] });
   });
 
   it('00 00 es ADD [BX+SI],AL', () => {

@@ -23,7 +23,7 @@ describe('dos', () => {
   it('INT 21 AH=09 escribe hasta $; 0D se descarta y 0A corta la línea', () => {
     const m = bootMachine();
     const text = [...'hola'].map((c) => c.charCodeAt(0));
-    m.mem.set([...text, 0x0d, 0x0a, ...text, 0x24, 0x41], phys(0x0dab, 0x102));
+    m.mem.set([...text, 0x0d, 0x0a, ...text, 0x24, 0x41], phys(0x073f, 0x102));
     m.regs[AX] = 0x0900;
     m.regs[DX] = 0x0102;
     const out = new Output();

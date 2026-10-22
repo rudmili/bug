@@ -33,8 +33,6 @@ export interface CommandState {
   editAddr: Address;
   /** Registro que se edita con `r <registro>`. */
   editReg: RegisterName | null;
-  /** Primera dirección después del último byte ensamblado con `a`. */
-  asmLimit: number;
 }
 
 export type RegisterName = (typeof REGISTER_NAMES)[number];
@@ -67,7 +65,6 @@ export function createCommandState(m: Machine): CommandState {
     dumpAddr: null,
     editAddr: { seg: m.sregs[DS], off: 0 },
     editReg: null,
-    asmLimit: 0x101,
   };
 }
 
@@ -122,7 +119,7 @@ function hexValue(token: Token, max = 0xffff): number {
   return n;
 }
 
-/** Dirección con segmento opcional: "100", "cs:100", "0dab:100". */
+/** Dirección con segmento opcional: "100", "cs:100", "073f:100". */
 function parseAddress(m: Machine, token: Token, defaultSeg: number): Address {
   const colon = token.text.indexOf(':');
   if (colon < 0) return { seg: m.sregs[defaultSeg], off: hexValue(token) };
@@ -198,18 +195,18 @@ function memoryNote(m: Machine, instr: Instr): string {
 }
 
 /** Columna donde termina la nota de memoria (alineada a la derecha). */
-const NOTE_END = 71;
+const NOTE_END = 70;
 
-/** Volcado de tres líneas de `r` y `t`. */
+/** Volcado de tres líneas de `r` y `t`, con el espaciado del DEBUG de MS-DOS: dos espacios entre registros y tres antes de las banderas. */
 export function registerDump(m: Machine): string[] {
   const r = m.regs;
   const s = m.sregs;
   const line1 = (['AX', 'BX', 'CX', 'DX', 'SP', 'BP', 'SI', 'DI'] as const)
     .map((name) => `${name}=${hex4(r[REG16.indexOf(name)])}`)
-    .join(' ');
+    .join('  ');
   const line2 =
-    (['DS', 'ES', 'SS', 'CS'] as const).map((name) => `${name}=${hex4(s[SREG.indexOf(name)])}`).join(' ') +
-    ` IP=${hex4(m.ip)} ${flagsText(m.flags)}`;
+    (['DS', 'ES', 'SS', 'CS'] as const).map((name) => `${name}=${hex4(s[SREG.indexOf(name)])}`).join('  ') +
+    `  IP=${hex4(m.ip)}   ${flagsText(m.flags)}`;
   const instr = decode(m, s[CS], m.ip);
   let line3 = formatLine(s[CS], m.ip, instr);
   const note = memoryNote(m, instr);
@@ -366,7 +363,6 @@ function runAssemble(m: Machine, state: CommandState, line: string, prompt: stri
   result.bytes.forEach((b, i) => writeByte(m, seg, off + i, b, 'code'));
   const next = off + result.bytes.length;
   state.asmAddr = { seg, off: next & 0xffff };
-  state.asmLimit = Math.max(state.asmLimit, next);
   return { output: [] };
 }
 

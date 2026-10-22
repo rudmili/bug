@@ -82,7 +82,7 @@ export function format(instr: Instr): string {
   return `${mnem.padEnd(8)}${texts.join(',')}`;
 }
 
-/** "0DAB:0100 C3            RET": dirección, bytes rellenados a 14 columnas e instrucción. */
+/** "073F:0100 C3            RET": dirección, bytes rellenados a 14 columnas e instrucción. */
 export function formatLine(seg: number, off: number, instr: Instr): string {
   const bytes = instr.bytes.map(hex2).join('');
   return `${hex4(seg)}:${hex4(off)} ${bytes.padEnd(14)}${format(instr)}`;

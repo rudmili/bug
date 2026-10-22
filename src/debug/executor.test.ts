@@ -7,7 +7,7 @@ import type { Machine } from './state';
 
 function load(bytes: number[], at = 0x100): Machine {
   const m = bootMachine();
-  m.mem.set(bytes, phys(0x0dab, at));
+  m.mem.set(bytes, phys(0x073f, at));
   return m;
 }
 
@@ -33,7 +33,7 @@ describe('executor: casos de aceptación', () => {
     const m = run(add8, 1);
     expect(hex(m.regs[AX])).toBe('0800');
     expect(hex(m.ip)).toBe('0102');
-    expect(flagsText(m.flags)).toBe('NV UP EI NG NZ NA PO NC');
+    expect(flagsText(m.flags)).toBe('NV UP EI PL NZ NA PO NC');
   });
 
   it('mov ah,8 / add ah,3 / sub ah,c', () => {
@@ -66,7 +66,7 @@ describe('executor: casos de aceptación', () => {
     ], 7);
     expect(hex(m.regs[AX])).toBe('000B');
     expect(hex(m.ip)).toBe('0116');
-    const bytes = Array.from({ length: 7 }, (_, i) => readByte(m, 0x0dab, 0x200 + i));
+    const bytes = Array.from({ length: 7 }, (_, i) => readByte(m, 0x073f, 0x200 + i));
     expect(bytes).toEqual([0x08, 0x00, 0x00, 0x03, 0x00, 0x0b, 0x00]);
   });
 
@@ -124,20 +124,20 @@ describe('executor: casos de aceptación', () => {
       0x58, 0x5b, 0x59, 0x5a, // pop ax, bx, cx, dx
       0xcd, 0x20, // int 20
     ]);
-    m.mem.set([0xd8, 0xd7], phys(0x0dab, 0x1100));
+    m.mem.set([0xd8, 0xd7], phys(0x073f, 0x1100));
     for (let i = 0; i < 7; i++) step(m);
-    expect(hex(m.regs[SP])).toBe('FFF6');
+    expect(hex(m.regs[SP])).toBe('00F5');
     for (let i = 0; i < 4; i++) step(m);
     expect([AX, BX, CX, DX].map((r) => hex(m.regs[r]))).toEqual(['D1D2', 'D3D4', 'D5D6', 'D7D8']);
-    expect(hex(m.regs[SP])).toBe('FFFE');
+    expect(hex(m.regs[SP])).toBe('00FD');
     expect(step(m)).toEqual({ kind: 'int', n: 0x20 });
     expect(m.writes.every((w) => w.kind === 'stack')).toBe(true);
   });
 });
 
 describe('executor: otros', () => {
-  it('RET con la pila inicial salta a 0000', () => {
-    const m = bootMachine();
+  it('RET con la pila inicial salta a 0000, al INT 20 del PSP', () => {
+    const m = load([0xc3]);
     expect(step(m)).toEqual({ kind: 'ok' });
     expect(m.ip).toBe(0);
     expect(step(m)).toEqual({ kind: 'int', n: 0x20 });
@@ -185,9 +185,9 @@ describe('executor: otros', () => {
       0xb9, 0x03, 0x00, // mov cx,3
       0xf3, 0xa4, // rep movsb
     ], 3);
-    m.mem.set([1, 2, 3], phys(0x0dab, 0x200));
+    m.mem.set([1, 2, 3], phys(0x073f, 0x200));
     expect(step(m)).toEqual({ kind: 'ok' });
-    expect([0, 1, 2].map((i) => readByte(m, 0x0dab, 0x300 + i))).toEqual([1, 2, 3]);
+    expect([0, 1, 2].map((i) => readByte(m, 0x073f, 0x300 + i))).toEqual([1, 2, 3]);
     expect(m.regs[CX]).toBe(0);
     expect(m.regs[SI]).toBe(0x203);
     expect(m.regs[DI]).toBe(0x303);
@@ -197,9 +197,9 @@ describe('executor: otros', () => {
     const m = load([0xe8, 0x01, 0x00, 0x90, 0xc3]);
     step(m);
     expect(m.ip).toBe(0x104);
-    expect(m.regs[SP]).toBe(0xfffc);
+    expect(m.regs[SP]).toBe(0x00fb);
     step(m);
     expect(m.ip).toBe(0x103);
-    expect(m.regs[SP]).toBe(0xfffe);
+    expect(m.regs[SP]).toBe(0x00fd);
   });
 });

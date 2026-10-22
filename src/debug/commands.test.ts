@@ -18,10 +18,11 @@ const hex = (n: number) => n.toString(16).toUpperCase().padStart(4, '0');
 
 describe('commands: r', () => {
   it('muestra el volcado de tres líneas', () => {
+    // Copiado de `r` en DOSBox: dos espacios entre registros, tres antes de las banderas y la nota hasta la columna 70
     expect(session().type('r')).toEqual([
-      'AX=0000 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000',
-      'DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0100 NV UP EI NG NZ NA PO NC',
-      '0DAB:0100 C3            RET',
+      'AX=0000  BX=0000  CX=0000  DX=0000  SP=00FD  BP=0000  SI=0000  DI=0000',
+      'DS=073F  ES=073F  SS=073F  CS=073F  IP=0100   NV UP EI PL NZ NA PO NC',
+      '073F:0100 0000          ADD     [BX+SI],AL                  DS:0000=CD',
     ]);
   });
 
@@ -30,9 +31,9 @@ describe('commands: r', () => {
     s.type('a', 'mov ah,8', 'add ah,3', 'sub ah,c', 'mov [2000],ah', '');
     const lines = s.type('t 3');
     expect(lines.slice(-3)).toEqual([
-      'AX=FF00 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000',
-      'DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0108 NV UP EI NG NZ AC PE CY',
-      '0DAB:0108 88260020      MOV     [2000],AH                    DS:2000=00',
+      'AX=FF00  BX=0000  CX=0000  DX=0000  SP=00FD  BP=0000  SI=0000  DI=0000',
+      'DS=073F  ES=073F  SS=073F  CS=073F  IP=0108   NV UP EI NG NZ AC PE CY',
+      '073F:0108 88260020      MOV     [2000],AH                   DS:2000=00',
     ]);
   });
 
@@ -63,54 +64,59 @@ describe('commands: r', () => {
 describe('commands: a y u', () => {
   it('u 100 106 con el estado inicial', () => {
     expect(session().type('u 100 106')).toEqual([
-      '0DAB:0100 C3            RET',
-      '0DAB:0101 0000          ADD     [BX+SI],AL',
-      '0DAB:0103 0000          ADD     [BX+SI],AL',
-      '0DAB:0105 0000          ADD     [BX+SI],AL',
+      '073F:0100 0000          ADD     [BX+SI],AL',
+      '073F:0102 0000          ADD     [BX+SI],AL',
+      '073F:0104 0000          ADD     [BX+SI],AL',
+      '073F:0106 0000          ADD     [BX+SI],AL',
     ]);
   });
 
   it('u sin rango muestra 20h bytes desde CS:IP y luego continúa', () => {
     const s = session();
     const first = s.type('u');
-    expect(first[0]).toBe('0DAB:0100 C3            RET');
-    expect(first.at(-1)).toMatch(/^0DAB:011F /);
-    expect(s.type('u')[0]).toMatch(/^0DAB:0121 /);
+    expect(first[0]).toBe('073F:0100 0000          ADD     [BX+SI],AL');
+    // Los restos de DOS en 011C: 34 00 (XOR AL,00) y 2E 07 (prefijo CS: y POP ES)
+    expect(first.slice(-3)).toEqual([
+      '073F:011C 3400          XOR     AL,00',
+      '073F:011E 2E            CS:',
+      '073F:011F 07            POP     ES',
+    ]);
+    expect(s.type('u')[0]).toMatch(/^073F:0120 /);
   });
 
   it('a avanza la dirección y una línea vacía sale', () => {
     const s = session();
     s.type('a');
-    expect(s.prompt()).toBe('0DAB:0100 ');
+    expect(s.prompt()).toBe('073F:0100 ');
     s.type('mov ah,8');
-    expect(s.prompt()).toBe('0DAB:0102 ');
+    expect(s.prompt()).toBe('073F:0102 ');
     s.type('');
     expect(s.prompt()).toBe('-');
     s.type('a');
-    expect(s.prompt()).toBe('0DAB:0102 ');
+    expect(s.prompt()).toBe('073F:0102 ');
   });
 
   it('-r en modo ensamblado da error y no avanza', () => {
     const s = session();
     s.type('a');
     expect(s.type('-r')).toEqual(['          ^ Error']);
-    expect(s.prompt()).toBe('0DAB:0100 ');
+    expect(s.prompt()).toBe('073F:0100 ');
   });
 
   it('cambiar un byte con e cambia lo que muestra u y lo que ejecuta t', () => {
     const s = session();
     s.type('a', 'mov ah,8', '');
     s.type('e 101 9');
-    expect(s.type('u 100 100')).toEqual(['0DAB:0100 B409          MOV     AH,09']);
+    expect(s.type('u 100 100')).toEqual(['073F:0100 B409          MOV     AH,09']);
     s.type('t');
     expect(hex(s.m.regs[AX])).toBe('0900');
   });
 
   it('comando pegado al argumento', () => {
     const s = session();
-    expect(s.type('u100 100')).toEqual(['0DAB:0100 C3            RET']);
+    expect(s.type('u100 100')).toEqual(['073F:0100 0000          ADD     [BX+SI],AL']);
     s.type('e1100 41');
-    expect(readByte(s.m, 0x0dab, 0x1100)).toBe(0x41);
+    expect(readByte(s.m, 0x073f, 0x1100)).toBe(0x41);
   });
 });
 
@@ -120,15 +126,15 @@ describe('commands: d y e', () => {
     s.type('a', 'mov ah,8', 'add ah,3', 'sub ah,c', '');
     const lines = s.type('d');
     expect(lines).toHaveLength(8);
-    expect(lines[0]).toBe('0DAB:0100  B4 08 80 C4 03 80 EC 0C-00 00 00 00 00 00 00 00   ................');
-    expect(s.type('d')[0]).toMatch(/^0DAB:0180 /);
+    expect(lines[0]).toBe('073F:0100  B4 08 80 C4 03 80 EC 0C-00 00 00 00 00 00 00 00   ................');
+    expect(s.type('d')[0]).toMatch(/^073F:0180 /);
   });
 
   it('d con rango que no empieza en fila', () => {
     const s = session();
     s.type('e 200 "Hola"');
     const [line] = s.type('d 202 l 4');
-    expect(line.startsWith('0DAB:0200        6C 61 00 00 ')).toBe(true);
+    expect(line.startsWith('073F:0200        6C 61 00 00 ')).toBe(true);
     // La columna ASCII empieza en 61, igual que en una fila completa; las dos primeras celdas van en blanco
     expect(line.indexOf('la..')).toBe(63);
     expect(line.endsWith('la..')).toBe(true);
@@ -137,19 +143,19 @@ describe('commands: d y e', () => {
   it('e con lista de bytes y cadenas', () => {
     const s = session();
     s.type('e 102 "hi" 0d,0a "$"');
-    expect([0x102, 0x103, 0x104, 0x105, 0x106].map((o) => readByte(s.m, 0x0dab, o))).toEqual([0x68, 0x69, 0x0d, 0x0a, 0x24]);
+    expect([0x102, 0x103, 0x104, 0x105, 0x106].map((o) => readByte(s.m, 0x073f, o))).toEqual([0x68, 0x69, 0x0d, 0x0a, 0x24]);
   });
 
   it('e interactivo muestra el byte y avanza', () => {
     const s = session();
     s.type('e 1100 69');
     s.type('e 1100');
-    expect(s.prompt()).toBe('0DAB:1100  69.');
+    expect(s.prompt()).toBe('073F:1100  69.');
     s.type('70');
-    expect(s.prompt()).toBe('0DAB:1101  00.');
+    expect(s.prompt()).toBe('073F:1101  00.');
     s.type('');
     expect(s.prompt()).toBe('-');
-    expect(readByte(s.m, 0x0dab, 0x1100)).toBe(0x70);
+    expect(readByte(s.m, 0x073f, 0x1100)).toBe(0x70);
   });
 });
 
@@ -183,9 +189,9 @@ describe('commands: t y g', () => {
     s.type('a 0100', 'mov ax,d5d6', 'mov bx,d3d4', 'mov cx,d1d2', 'push [1100]', 'push ax', 'push bx', 'push cx',
       'pop ax', 'pop bx', 'pop cx', 'pop dx', 'int 20', '');
     s.type('t 7');
-    expect(hex(s.m.regs[SP])).toBe('FFF6');
+    expect(hex(s.m.regs[SP])).toBe('00F5');
     s.type('t 4');
-    expect([AX, BX, CX, DX, SP].map((r) => hex(s.m.regs[r]))).toEqual(['D1D2', 'D3D4', 'D5D6', 'D7D8', 'FFFE']);
+    expect([AX, BX, CX, DX, SP].map((r) => hex(s.m.regs[r]))).toEqual(['D1D2', 'D3D4', 'D5D6', 'D7D8', '00FD']);
     expect(s.type('t')).toEqual(['Program terminated normally']);
   });
 
@@ -197,7 +203,7 @@ describe('commands: t y g', () => {
     expect(hex(s.m.ip)).toBe('0206');
   });
 
-  it('g con el estado inicial: RET a 0000 y INT 20', () => {
+  it('g con el estado inicial: recorre los ceros, da la vuelta al segmento y termina en el INT 20 del PSP', () => {
     expect(session().type('g')).toEqual(['Program terminated normally']);
   });
 
@@ -212,7 +218,7 @@ describe('commands: t y g', () => {
   it('opcode no definido detiene con aviso', () => {
     const s = session();
     s.type('e 100 0f');
-    expect(s.type('g')[0]).toMatch(/Opcode no definido \(0F\) en 0DAB:0100/);
+    expect(s.type('g')[0]).toMatch(/Opcode no definido \(0F\) en 073F:0100/);
   });
 
   it('división por cero', () => {

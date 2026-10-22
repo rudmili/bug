@@ -1,7 +1,7 @@
 import { FLAG_CODES } from './flags';
 import { hex2, hex4, toSigned16 } from './hex';
 import { phys, readWord } from './memory';
-import { CS, DS, REG16, SP, SREG, SS } from './state';
+import { CS, DS, INITIAL_SP, REG16, SP, SREG, SS } from './state';
 import type { Machine, Snapshot, WriteRecord } from './state';
 import type {
   DebugView,
@@ -55,7 +55,9 @@ const FLAG_LABELS: Record<FlagKey, string> = {
 };
 
 const ROWS = 8;
-const STACK_START = 0xfffe;
+/** La pila vacía empieza en el SP inicial y puede crecer hasta el principio del segmento, pisando el PSP. */
+const STACK_START = INITIAL_SP;
+const STACK_LIMIT = 0x0000;
 
 function registerValue(s: Pick<Snapshot, 'regs' | 'sregs' | 'ip'>, name: RegisterName): number {
   if (name === 'IP') return s.ip;
@@ -78,7 +80,7 @@ function memoryRows(m: Machine, seg: number, start: number, hot: ReadonlySet<num
   });
 }
 
-function stackView(m: Machine, limit: number): StackViewModel {
+function stackView(m: Machine): StackViewModel {
   const sp = m.regs[SP];
   const ss = m.sregs[SS];
   const rows: StackRowView[] = [];
@@ -100,13 +102,13 @@ function stackView(m: Machine, limit: number): StackViewModel {
     rows.push(row((sp - k * 2) & 0xffff, false, k === 1 ? 'libre · próximo push' : 'libre'));
   }
 
-  const total = Math.max(STACK_START - limit, 0);
+  const total = STACK_START - STACK_LIMIT;
   const used = Math.min(Math.max(toSigned16(STACK_START - sp), 0), total);
   return {
     pointer: `SS:SP ${hex4(ss)}:${hex4(sp)}`,
     rows,
     start: hex4(STACK_START),
-    limit: hex4(limit),
+    limit: hex4(STACK_LIMIT),
     usedBytes: used,
     totalBytes: total,
     position: total === 0 ? 0 : used / total,
@@ -121,8 +123,6 @@ export interface BuildInput {
   writes: readonly WriteRecord[];
   /** Dirección que mostró `d` o editó `e`. */
   dataFocus?: number;
-  /** Primera dirección libre después del programa ensamblado. */
-  asmLimit: number;
   lines: TerminalLine[];
   prompt: string;
   state: ViewState;
@@ -188,7 +188,7 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
       captionHot: dataHot,
       rows: memoryRows(m, ds, dataAnchor & 0xfff0, next.hotBytes),
     },
-    stack: stackView(m, input.asmLimit),
+    stack: stackView(m),
     // Lo marca session cuando la línea fue `q`
     restarted: false,
   };

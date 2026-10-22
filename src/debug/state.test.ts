@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { AX, CS, SP, createMachine, getReg8, setReg8, snapshot } from './state';
 
 describe('state', () => {
-  it('arranca con el estado de DOSBox-X', () => {
+  it('arranca con el estado de DEBUG en DOSBox', () => {
     const m = createMachine();
-    expect([...m.sregs]).toEqual([0x0dab, 0x0dab, 0x0dab, 0x0dab]);
+    expect([...m.sregs]).toEqual([0x073f, 0x073f, 0x073f, 0x073f]);
     expect(m.ip).toBe(0x100);
-    expect(m.regs[SP]).toBe(0xfffe);
+    expect(m.regs[SP]).toBe(0x00fd);
     expect(m.regs[AX]).toBe(0);
-    expect(m.flags).toMatchObject({ IF: true, SF: true, CF: false, ZF: false, OF: false });
+    expect(m.flags).toMatchObject({ IF: true, SF: false, CF: false, ZF: false, OF: false });
   });
 
   it('escribir una mitad no altera la otra', () => {
@@ -30,7 +30,7 @@ describe('state', () => {
     m.sregs[CS] = 2;
     m.flags.CF = true;
     expect(s.regs[AX]).toBe(0);
-    expect(s.sregs[CS]).toBe(0x0dab);
+    expect(s.sregs[CS]).toBe(0x073f);
     expect(s.flags.CF).toBe(false);
   });
 });

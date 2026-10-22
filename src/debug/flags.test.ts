@@ -26,8 +26,8 @@ describe('flags', () => {
     expect(parity(0x1ff)).toBe(true);
   });
 
-  it('el estado inicial se lee NV UP EI NG NZ NA PO NC', () => {
-    expect(flagsText(createMachine().flags)).toBe('NV UP EI NG NZ NA PO NC');
+  it('el estado inicial se lee NV UP EI PL NZ NA PO NC', () => {
+    expect(flagsText(createMachine().flags)).toBe('NV UP EI PL NZ NA PO NC');
   });
 
   it('8 + 3 − 4 = 07', () => {

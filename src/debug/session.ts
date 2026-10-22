@@ -35,7 +35,6 @@ export function createDebugSession(): DebugSession {
       prev,
       writes: machine.writes,
       dataFocus,
-      asmLimit: commands.asmLimit,
       lines,
       prompt: promptFor(machine, commands),
       state: viewState,

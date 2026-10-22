@@ -8,11 +8,15 @@ describe('memory', () => {
     expect(phys(0x1000, 0x10000)).toBe(0x10000);
   });
 
-  it('tiene INT 20 en 0000 y RET en 0100', () => {
+  it('arranca con el PSP de DOSBox en 073F:0000 y ceros desde 0100', () => {
     const m = bootMachine();
-    expect(readWord(m, 0x0dab, 0)).toBe(0x20cd);
-    expect(readByte(m, 0x0dab, 0x100)).toBe(0xc3);
-    expect(readByte(m, 0x0dab, 0x101)).toBe(0);
+    expect(readWord(m, 0x073f, 0)).toBe(0x20cd);
+    expect([0x50, 0x51, 0x52].map((off) => readByte(m, 0x073f, off))).toEqual([0xcd, 0x21, 0xcb]);
+    expect(readByte(m, 0x073f, 0x5c)).toBe(0);
+    expect(readByte(m, 0x073f, 0x5d)).toBe(0x20);
+    expect(readWord(m, 0x073f, 0x80)).toBe(0x0d00);
+    expect(readByte(m, 0x073f, 0x100)).toBe(0);
+    expect(readWord(m, 0x073f, 0x11c)).toBe(0x0034);
   });
 
   it('las palabras son little endian y dan la vuelta en 16 bits', () => {
@@ -29,8 +33,8 @@ describe('memory', () => {
   it('registra las escrituras con su valor anterior', () => {
     const m = bootMachine();
     clearWrites(m);
-    writeByte(m, 0x0dab, 0x100, 0x90, 'code');
-    expect(m.writes).toEqual([{ addr: phys(0x0dab, 0x100), old: 0xc3, kind: 'code' }]);
+    writeByte(m, 0x073f, 0x11c, 0x90, 'code');
+    expect(m.writes).toEqual([{ addr: phys(0x073f, 0x11c), old: 0x34, kind: 'code' }]);
     clearWrites(m);
     expect(m.writes).toEqual([]);
   });

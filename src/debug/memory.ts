@@ -29,11 +29,33 @@ export function clearWrites(m: Machine): void {
   m.writes = [];
 }
 
-/** Máquina inicial con INT 20 en 0DAB:0000 y RET en 0DAB:0100. */
+/**
+ * Contenido inicial del segmento de DEBUG, copiado de `d 0 ff` y `d 100 17f` en DOSBox, como
+ * [desplazamiento, bytes]. El resto de la memoria está en cero.
+ */
+const BOOT_MEMORY: [offset: number, bytes: string][] = [
+  // PSP: INT 20, tope de memoria, vectores guardados, tabla de archivos, versión de DOS 5.00, INT 21 + RETF,
+  // dos FCB vacíos (unidad 0 y nombre en blanco) y la línea de comandos vacía en 0080
+  [0x0000, 'CD 20 3E A7 00 EA FD FF AD DE 4F 03 A3 01 8A 03'],
+  [0x0010, 'A3 01 17 03 A3 01 92 01 01 01 01 00 02 FF FF FF'],
+  [0x0020, 'FF FF FF FF FF FF FF FF FF FF FF FF'],
+  [0x0032, '14 00 18 00 3F 07 FF FF FF FF'],
+  [0x0040, '05'],
+  [0x0050, 'CD 21 CB'],
+  [0x005d, '20 20 20 20 20 20 20 20 20 20 20'],
+  [0x006d, '20 20 20 20 20 20 20 20 20 20 20'],
+  [0x0081, '0D'],
+  // Restos que deja DOS después del programa
+  [0x011c, '34 00 2E 07'],
+];
+
+/** Máquina inicial: el PSP en 073F:0000 y ceros desde 0100, salvo los restos de DOS. */
 export function bootMachine(): Machine {
   const m = createMachine();
-  m.mem[phys(INITIAL_SEGMENT, 0x0000)] = 0xcd;
-  m.mem[phys(INITIAL_SEGMENT, 0x0001)] = 0x20;
-  m.mem[phys(INITIAL_SEGMENT, 0x0100)] = 0xc3;
+  for (const [offset, bytes] of BOOT_MEMORY) {
+    bytes.split(' ').forEach((b, i) => {
+      m.mem[phys(INITIAL_SEGMENT, offset + i)] = parseInt(b, 16);
+    });
+  }
   return m;
 }

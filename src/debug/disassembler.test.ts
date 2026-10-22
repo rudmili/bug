@@ -60,7 +60,7 @@ describe('disassembler', () => {
 
   it('línea completa como la de u', () => {
     const m = bootMachine();
-    expect(formatLine(0x0dab, 0x100, decode(m, 0x0dab, 0x100))).toBe('0DAB:0100 C3            RET');
+    expect(formatLine(0x073f, 0x100, decode(m, 0x073f, 0x100))).toBe('073F:0100 0000          ADD     [BX+SI],AL');
     m.mem.set([0x88, 0x26, 0x00, 0x20], phys(0x0dab, 0x108));
     expect(formatLine(0x0dab, 0x108, decode(m, 0x0dab, 0x108))).toBe('0DAB:0108 88260020      MOV     [2000],AH');
   });

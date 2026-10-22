@@ -72,13 +72,13 @@ export interface StackRowView {
 }
 
 export interface StackViewModel {
-  /** "SS:SP 0DAB:FFFE". */
+  /** "SS:SP 073F:00FD". */
   pointer: string;
   /** De la dirección más alta a la más baja: los valores apilados visibles, SP y las posiciones libres siguientes. */
   rows: StackRowView[];
-  /** Dirección donde empieza la pila vacía: "FFFE". */
+  /** Dirección donde empieza la pila vacía: "00FD". */
   start: string;
-  /** Primera dirección libre después del programa: hasta ahí puede crecer la pila. */
+  /** Hasta dónde puede crecer la pila: el principio del segmento (arranca debajo del programa, dentro del PSP). */
   limit: string;
   usedBytes: number;
   totalBytes: number;
@@ -98,7 +98,7 @@ export interface TerminalLine {
 
 export interface DebugView {
   lines: TerminalLine[];
-  /** Prompt del campo de entrada: "-" en modo comando, "0DAB:0102 " al ensamblar, ":" al editar un registro. */
+  /** Prompt del campo de entrada: "-" en modo comando, "073F:0102 " al ensamblar, ":" al editar un registro. */
   prompt: string;
   registers: RegisterView[];
   flags: FlagView[];

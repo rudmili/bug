@@ -25,9 +25,9 @@ describe('session', () => {
     const v = s.submit('r');
     expect(v.lines.map((l) => [l.kind, l.text])).toEqual([
       ['command', '-r'],
-      ['output', 'AX=0000 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000'],
-      ['output', 'DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0100 NV UP EI NG NZ NA PO NC'],
-      ['output', '0DAB:0100 C3            RET'],
+      ['output', 'AX=0000  BX=0000  CX=0000  DX=0000  SP=00FD  BP=0000  SI=0000  DI=0000'],
+      ['output', 'DS=073F  ES=073F  SS=073F  CS=073F  IP=0100   NV UP EI PL NZ NA PO NC'],
+      ['output', '073F:0100 0000          ADD     [BX+SI],AL                  DS:0000=CD'],
     ]);
     expect(s.getView()).toBe(v);
   });
@@ -37,7 +37,7 @@ describe('session', () => {
     s.submit('a');
     const v = s.submit('-r');
     expect(v.lines.slice(-2)).toEqual([
-      { id: 1, kind: 'command', text: '0DAB:0100 -r' },
+      { id: 1, kind: 'command', text: '073F:0100 -r' },
       { id: 2, kind: 'error', text: '          ^ Error' },
     ]);
   });
@@ -55,7 +55,7 @@ describe('session', () => {
       ...Array(7).fill('que tengas un feliz dia!'),
       'Program terminated normally',
     ]);
-    expect(v.lines.slice(0, 3).map((l) => l.text)).toEqual(['-a 0100', '0DAB:0100 jmp 130', '0DAB:0102 ']);
+    expect(v.lines.slice(0, 3).map((l) => l.text)).toEqual(['-a 0100', '073F:0100 jmp 130', '073F:0102 ']);
   });
 
   it('q vuelve todo al estado inicial y limpia la terminal', () => {

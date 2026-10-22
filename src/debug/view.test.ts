@@ -11,7 +11,7 @@ function harness() {
   const cmd = createCommandState(m);
   let state = createViewState();
   const build = (prev = snapshot(m), dataFocus?: number): DebugView => {
-    const r = buildView({ machine: m, prev, writes: m.writes, dataFocus, asmLimit: cmd.asmLimit, lines: [], prompt: '-', state });
+    const r = buildView({ machine: m, prev, writes: m.writes, dataFocus, lines: [], prompt: '-', state });
     state = r.state;
     return r.view;
   };
@@ -35,14 +35,14 @@ describe('view', () => {
   it('estado inicial', () => {
     const v = harness().initial;
     expect(v.registers.map((r) => `${r.name}=${r.value}`).join(' ')).toBe(
-      'AX=0000 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000 DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0100',
+      'AX=0000 BX=0000 CX=0000 DX=0000 SP=00FD BP=0000 SI=0000 DI=0000 DS=073F ES=073F SS=073F CS=073F IP=0100',
     );
     expect(hot(v)).toEqual([]);
-    expect(v.flags.map((f) => f.code).join(' ')).toBe('NV UP EI NG NZ NA PO NC');
+    expect(v.flags.map((f) => f.code).join(' ')).toBe('NV UP EI PL NZ NA PO NC');
     expect(v.flags.map((f) => f.label)).toEqual(['Desb.', 'Direc.', 'Interr.', 'Signo', 'Cero', 'Aux.', 'Paridad', 'Acarreo']);
     expect(v.code.rows).toHaveLength(8);
     expect(v.code.rows[0].address).toBe('0100');
-    expect(v.code.rows[0].bytes[0]).toEqual({ value: 'C3', nonZero: true, changed: false, isIp: true });
+    expect(v.code.rows[0].bytes[0]).toEqual({ value: '00', nonZero: false, changed: false, isIp: true });
     expect(v.code.captionValue).toBe('0100');
     expect(v.data.rows[0].address).toBe('0200');
     expect(v.data.captionValue).toBe('[0200]');
@@ -51,20 +51,20 @@ describe('view', () => {
 
   it('pila inicial', () => {
     const s = harness().initial.stack;
-    expect(s.pointer).toBe('SS:SP 0DAB:FFFE');
+    expect(s.pointer).toBe('SS:SP 073F:00FD');
     expect(s.rows).toEqual([
-      { address: 'FFFE', value: '0000', isSp: true, note: 'tope · retorno a DOS' },
-      { address: 'FFFC', value: '0000', isSp: false, note: 'libre · próximo push' },
-      { address: 'FFFA', value: '0000', isSp: false, note: 'libre' },
-      { address: 'FFF8', value: '0000', isSp: false, note: 'libre' },
+      { address: '00FD', value: '0000', isSp: true, note: 'tope · retorno a DOS' },
+      { address: '00FB', value: '0000', isSp: false, note: 'libre · próximo push' },
+      { address: '00F9', value: '0000', isSp: false, note: 'libre' },
+      { address: '00F7', value: '0000', isSp: false, note: 'libre' },
     ]);
-    expect(s).toMatchObject({ start: 'FFFE', limit: '0101', usedBytes: 0, totalBytes: 0xfffe - 0x101, position: 0 });
+    expect(s).toMatchObject({ start: '00FD', limit: '0000', usedBytes: 0, totalBytes: 0xfd, position: 0 });
   });
 
   it('resalta lo que cambió y lo conserva en comandos que no modifican la máquina', () => {
     const h = harness();
-    let v = h.submit('a', 'mov ah,8', 'add ah,3', '');
-    // Cada línea de a es un comando: quedan resaltados los bytes del último (add ah,3)
+    let v = h.submit('a', 'mov ah,8', 'sub ah,c', '');
+    // Cada línea de a es un comando: quedan resaltados los bytes del último (sub ah,c)
     expect(v.code.rows[0].bytes.slice(0, 6).map((b) => b.changed)).toEqual([false, false, true, true, true, false]);
     v = h.submit('t');
     expect(hot(v)).toEqual(['AX', 'IP']);
@@ -73,9 +73,9 @@ describe('view', () => {
     v = h.submit('u');
     expect(hot(v)).toEqual(['AX', 'IP']);
     v = h.submit('t');
-    expect(hotFlags(v)).toEqual(['SF']);
+    expect(hotFlags(v)).toEqual(['SF', 'AF', 'PF', 'CF']);
     v = h.submit('xyz');
-    expect(hotFlags(v)).toEqual(['SF']);
+    expect(hotFlags(v)).toEqual(['SF', 'AF', 'PF', 'CF']);
   });
 
   it('la ventana de datos sigue la última escritura de una instrucción', () => {
@@ -91,7 +91,7 @@ describe('view', () => {
     expect(v.data.captionValue).toBe('[2000]');
     expect(v.data.captionHot).toBe(false);
     expect(v.stack.rows.map((r) => [r.address, r.isSp])).toEqual([
-      ['FFFE', false], ['FFFC', true], ['FFFA', false], ['FFF8', false], ['FFF6', false],
+      ['00FD', false], ['00FB', true], ['00F9', false], ['00F7', false], ['00F5', false],
     ]);
     expect(v.stack.rows[1].value).toBe('0800');
     expect(v.stack.usedBytes).toBe(2);
@@ -119,11 +119,11 @@ describe('view', () => {
     expect(v.code.rows[0].address).toBe('0100');
   });
 
-  it('el límite de la pila sigue al programa ensamblado', () => {
+  it('la pila puede crecer hasta el principio del segmento, sin importar el programa', () => {
     const h = harness();
     const v = h.submit('a', 'mov ax,1', 'int 20', '');
-    expect(v.stack.limit).toBe('0105');
-    expect(v.stack.totalBytes).toBe(0xfffe - 0x105);
+    expect(v.stack.limit).toBe('0000');
+    expect(v.stack.totalBytes).toBe(0xfd);
   });
 
   it('cada vista es un objeto nuevo', () => {
