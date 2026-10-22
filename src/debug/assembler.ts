@@ -286,9 +286,9 @@ function encode(c: Candidate, ops: ParsedOperand[], addr: number): number[] | nu
   } else if (c.group !== null) {
     throw new Error('grupo sin operando r/m');
   }
-  if (c.opcode >= 0x40 && c.opcode < 0x60) bytes[0] |= (ops[0] as { index: number }).index;
-  if (c.opcode >= 0x90 && c.opcode < 0x98) bytes[0] |= (ops[1] as { index: number }).index;
-  if (c.opcode >= 0xb0 && c.opcode < 0xc0) bytes[0] |= (ops[0] as { index: number }).index;
+  // Registro dentro del opcode (40+r, 90+r, B0+r…): cada registro tiene su propio candidato en la tabla
+  const zIndex = specs.findIndex((s) => s === 'Zb' || s === 'Zw');
+  if (zIndex >= 0 && (ops[zIndex] as { index: number }).index !== (c.opcode & 7)) return null;
 
   for (let i = 0; i < specs.length; i++) {
     const op = ops[i];
@@ -342,6 +342,8 @@ function assembleInstruction(mnemText: string, mnemCol: number, rest: string, re
   const parts = rest.trim() === '' ? [] : splitOperands(rest, restCol);
   const parsed = parts.map((p) => parseOperand(p.text, p.col));
   let ops = parsed.map((p) => p.op);
+  // AAM y AAD sin operando trabajan en base 10, como en DEBUG: D4 0A y D5 0A
+  if ((mnem === 'AAM' || mnem === 'AAD') && ops.length === 0) ops = [{ k: 'imm', value: 0x0a, col: restCol }];
   const distance = parsed.find((p) => p.distance)?.distance ?? null;
 
   const mems = ops.filter((o) => o.k === 'mem');
@@ -350,6 +352,8 @@ function assembleInstruction(mnemText: string, mnemCol: number, rest: string, re
   // XCHG es conmutativa: XCHG BX,AX usa la forma corta igual que XCHG AX,BX
   if (mnem === 'XCHG' && ops.length === 2 && ops[1].k === 'reg' && ops[1].size === 16 && ops[1].index === 0) {
     ops = [ops[1], ops[0]];
+    // XCHG AX,AX es el mismo byte que NOP
+    if (ops[1].k === 'reg' && ops[1].size === 16 && ops[1].index === 0) return [0x90];
   }
 
   const far = mems.some((m) => m.k === 'mem' && m.far);

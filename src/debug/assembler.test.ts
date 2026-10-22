@@ -87,6 +87,29 @@ describe('assembler: sintaxis', () => {
     expect(bytes('call far [bx]')).toBe('FF 1F');
   });
 
+  it('registro dentro del opcode: cada registro con su byte', () => {
+    const regs16 = ['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di'];
+    const regs8 = ['al', 'cl', 'dl', 'bl', 'ah', 'ch', 'dh', 'bh'];
+    const hex2 = (n: number) => n.toString(16).toUpperCase();
+    regs16.forEach((r, i) => {
+      expect(bytes(`inc ${r}`)).toBe(hex2(0x40 + i));
+      expect(bytes(`dec ${r}`)).toBe(hex2(0x48 + i));
+      expect(bytes(`push ${r}`)).toBe(hex2(0x50 + i));
+      expect(bytes(`pop ${r}`)).toBe(hex2(0x58 + i));
+      expect(bytes(`mov ${r},1`)).toBe(`${hex2(0xb8 + i)} 01 00`);
+      expect(bytes(`xchg ax,${r}`)).toBe(hex2(0x90 + i));
+      expect(bytes(`xchg ${r},ax`)).toBe(hex2(0x90 + i));
+    });
+    regs8.forEach((r, i) => expect(bytes(`mov ${r},1`)).toBe(`${hex2(0xb0 + i)} 01`));
+  });
+
+  it('NOP, y AAM y AAD sin operando en base 10', () => {
+    expect(bytes('nop')).toBe('90');
+    expect(bytes('aam')).toBe('D4 0A');
+    expect(bytes('aad')).toBe('D5 0A');
+    expect(bytes('aam 8')).toBe('D4 08');
+  });
+
   it('alias y formas cortas', () => {
     expect(bytes('je 100')).toBe('74 FE');
     expect(bytes('inc ax')).toBe('40');
