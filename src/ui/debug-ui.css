@@ -487,6 +487,37 @@ body {
   .reset { transition: background-color 120ms ease-out, color 120ms ease-out; }
 }
 
+/* Confirmación de Reiniciar: <dialog> modal sobre un fondo oscurecido */
+.confirm {
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-ui);
+  white-space: normal;
+}
+.confirm::backdrop { background: rgb(0 0 0 / 0.6); }
+.confirm__title { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.confirm__text { margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.confirm__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.confirm__button {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--cell);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.confirm__button:hover { background: var(--tab-on); }
+.confirm__button:focus-visible { outline: 2px solid var(--cmd); outline-offset: 2px; }
+.confirm__button--danger { background: var(--hot-bg); color: var(--hot-text); }
+
 /* ============================== GUÍA CON LA TERMINAL VACÍA ============================== */
 /* margin: auto la centra dentro de .term__out (anula el margin-top: auto del primer hijo) */
 .term__out > .hint { margin: auto; }

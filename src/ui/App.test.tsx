@@ -1,10 +1,31 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDebugSession } from '../debug/session';
 import { App } from './App';
 import { useCommandLog } from './store';
+
+// jsdom no implementa los diálogos modales: lo justo para <dialog> con <form method="dialog"> y Escape
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close = function (this: HTMLDialogElement, value?: string) {
+    if (value !== undefined) this.returnValue = value;
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+  document.addEventListener('submit', (event) => {
+    const form = event.target as HTMLFormElement;
+    if (form.getAttribute('method') !== 'dialog') return;
+    event.preventDefault();
+    form.closest('dialog')?.close((event.submitter as HTMLButtonElement | null)?.value ?? '');
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') document.querySelector<HTMLDialogElement>('dialog[open]')?.close();
+  });
+});
 
 function setup() {
   const user = userEvent.setup();
@@ -82,22 +103,31 @@ describe('App', () => {
     expect(input().value).toBe('q');
   });
 
-  it('Reiniciar pide confirmación y deja la máquina como al abrir', async () => {
+  it('Reiniciar pide confirmación en un diálogo y deja la máquina como al abrir', async () => {
     const { user, output, type, register } = setup();
     const reset = screen.getByRole('button', { name: /Reiniciar/ });
     expect(reset).toHaveProperty('disabled', true);
     await type('r ax', '1234');
 
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
     await user.click(reset);
-    expect(confirm).toHaveBeenCalledOnce();
+    const dialog = screen.getByRole('dialog', { name: '¿Reiniciar la máquina?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(register('AX')).toBe('1234');
 
-    confirm.mockReturnValueOnce(true);
     await user.click(reset);
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Reiniciar' }));
     expect(register('AX')).toBe('0000');
     expect(within(output()).getByText('DEBUG 8086')).toBeTruthy();
     expect(useCommandLog.getState()).toMatchObject({ log: [], history: [] });
+  });
+
+  it('Escape cierra el diálogo sin reiniciar', async () => {
+    const { user, type, register } = setup();
+    await type('r ax', '1234');
+    await user.click(screen.getByRole('button', { name: /Reiniciar/ }));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(register('AX')).toBe('1234');
   });
 
   it('las pestañas siguen el patrón de WAI-ARIA', async () => {
