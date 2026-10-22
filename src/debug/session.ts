@@ -1,5 +1,5 @@
 import { createCommandState, promptFor, run } from './commands';
-import type { CommandState } from './commands';
+import type { CommandState, RunResult } from './commands';
 import { bootMachine, clearWrites } from './memory';
 import { snapshot } from './state';
 import type { Machine } from './state';
@@ -52,7 +52,14 @@ export function createDebugSession(): DebugSession {
       const echo: TerminalLine = { id: nextId++, kind: 'command', text: promptFor(machine, commands) + line };
       const prev = snapshot(machine);
       clearWrites(machine);
-      const result = run(machine, commands, line);
+      let result: RunResult;
+      try {
+        result = run(machine, commands, line);
+      } catch (e) {
+        // Un fallo del simulador no debe dejar la página en blanco: se avisa en la terminal y se sigue
+        const message = e instanceof Error ? e.message : String(e);
+        result = { output: [{ kind: 'error', text: `Error interno del simulador: ${message}` }] };
+      }
       if (result.reset) {
         reset();
         return view;

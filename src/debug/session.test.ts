@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MAX_LINES, createDebugSession } from './session';
+
+// Simula un bug del simulador: la línea "boom" hace fallar a commands.run
+vi.mock('./commands', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./commands')>();
+  return {
+    ...original,
+    run: (...args: Parameters<typeof original.run>) => {
+      if (args[2] === 'boom') throw new Error('falla de prueba');
+      return original.run(...args);
+    },
+  };
+});
 
 describe('session', () => {
   it('arranca vacía con prompt de comando', () => {
@@ -54,6 +66,18 @@ describe('session', () => {
     expect(v.lines).toEqual([]);
     expect(v.registers[0]).toEqual({ name: 'AX', value: '0000', changed: false });
     expect(s.submit('r').lines[0].id).toBeGreaterThan(2);
+  });
+
+  it('un fallo interno se muestra en la terminal y la sesión sigue funcionando', () => {
+    const s = createDebugSession();
+    s.submit('r ax');
+    s.submit('1234');
+    const v = s.submit('boom');
+    expect(v.lines.slice(-2).map((l) => [l.kind, l.text])).toEqual([
+      ['command', '-boom'],
+      ['error', 'Error interno del simulador: falla de prueba'],
+    ]);
+    expect(s.submit('r').registers[0].value).toBe('1234');
   });
 
   it('conserva como máximo MAX_LINES líneas', () => {
