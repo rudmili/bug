@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { assemble } from './assembler';
 import { step } from './executor';
 import { flagsText } from './flags';
 import { bootMachine, phys, readByte } from './memory';
-import { AX, BX, CX, DI, DX, SI, SP } from './state';
+import { AX, BX, CS, CX, DI, DS, DX, ES, SI, SP, getReg8 } from './state';
 import type { Machine } from './state';
 
 function load(bytes: number[], at = 0x100): Machine {
@@ -201,5 +202,198 @@ describe('executor: otros', () => {
     step(m);
     expect(m.ip).toBe(0x103);
     expect(m.regs[SP]).toBe(0x00fd);
+  });
+});
+
+/** Ensambla las líneas desde 0100, como `a 100`. */
+function program(...lines: string[]): Machine {
+  const m = bootMachine();
+  let off = 0x100;
+  for (const line of lines) {
+    const r = assemble(line, off);
+    if (!r.ok) throw new Error(`No se pudo ensamblar: ${line}`);
+    m.mem.set(r.bytes, phys(0x073f, off));
+    off += r.bytes.length;
+  }
+  return m;
+}
+
+/** Ensambla y ejecuta todas las líneas. */
+function exec(...lines: string[]): Machine {
+  const m = program(...lines);
+  for (let i = 0; i < lines.length; i++) expect(step(m)).toEqual({ kind: 'ok' });
+  return m;
+}
+
+const al = (m: Machine) => getReg8(m, 0);
+const ah = (m: Machine) => getReg8(m, 4);
+const text = (m: Machine, off: number, s: string) => m.mem.set([...s].map((c) => c.charCodeAt(0)), phys(0x073f, off));
+
+describe('executor: aritmética y lógica', () => {
+  it('ADC y SBB suman y restan el acarreo', () => {
+    expect(al(exec('stc', 'mov al,5', 'adc al,1'))).toBe(7);
+    expect(al(exec('mov al,7', 'stc', 'sbb al,2'))).toBe(4);
+  });
+
+  it('CMP y TEST solo cambian las banderas', () => {
+    const m = exec('mov ax,5', 'cmp ax,5');
+    expect(m.regs[AX]).toBe(5);
+    expect(m.flags.ZF).toBe(true);
+    const t = exec('mov al,80', 'test al,80');
+    expect(al(t)).toBe(0x80);
+    expect(t.flags).toMatchObject({ ZF: false, SF: true, CF: false, OF: false });
+  });
+
+  it('NEG pone CF con un valor distinto de cero, y NOT invierte los bits', () => {
+    const m = exec('mov al,1', 'neg al');
+    expect(al(m)).toBe(0xff);
+    expect(m.flags.CF).toBe(true);
+    expect(al(exec('mov al,ff', 'not al'))).toBe(0);
+  });
+
+  it('XCHG intercambia, CBW y CWD extienden el signo', () => {
+    const m = exec('mov ax,1', 'mov bx,2', 'xchg ax,bx');
+    expect([m.regs[AX], m.regs[BX]]).toEqual([2, 1]);
+    const c = exec('mov al,80', 'cbw', 'cwd');
+    expect(hex(c.regs[AX])).toBe('FF80');
+    expect(hex(c.regs[DX])).toBe('FFFF');
+  });
+
+  it('DAA y DAS corrigen sumas y restas BCD', () => {
+    const add = exec('mov al,15', 'add al,27', 'daa');
+    expect(al(add)).toBe(0x42);
+    expect(add.flags.CF).toBe(false);
+    expect(al(exec('mov al,42', 'sub al,27', 'das'))).toBe(0x15);
+  });
+
+  it('AAA y AAS ajustan el BCD desempaquetado', () => {
+    const add = exec('mov ax,9', 'add al,3', 'aaa');
+    expect(hex(add.regs[AX])).toBe('0102');
+    expect(add.flags.CF).toBe(true);
+    const sub = exec('mov ax,102', 'sub al,3', 'aas');
+    expect(hex(sub.regs[AX])).toBe('0009');
+    expect(sub.flags.CF).toBe(true);
+  });
+
+  it('AAM y AAD pasan entre binario y dos dígitos', () => {
+    const m = exec('mov al,2b', 'aam');
+    expect([ah(m), al(m)]).toEqual([4, 3]);
+    expect(hex(exec('mov ax,403', 'aad').regs[AX])).toBe('002B');
+  });
+
+  it('AAM con base cero da la interrupción de división', () => {
+    expect(step(load([0xd4, 0x00]))).toEqual({ kind: 'int', n: 0 });
+  });
+
+  it('INTO solo interrumpe con desbordamiento', () => {
+    const m = program('mov al,7f', 'add al,1', 'into');
+    step(m);
+    step(m);
+    expect(step(m)).toEqual({ kind: 'int', n: 4 });
+    expect(step(load([0xce]))).toEqual({ kind: 'ok' });
+  });
+});
+
+describe('executor: banderas y transferencias', () => {
+  it('CLC, STC, CMC, CLD, STD, CLI y STI', () => {
+    expect(exec('stc', 'cmc', 'std', 'cli').flags).toMatchObject({ CF: false, DF: true, IF: false });
+    expect(exec('clc', 'stc', 'cld', 'sti', 'nop').flags).toMatchObject({ CF: true, DF: false, IF: true });
+  });
+
+  it('LAHF, SAHF, PUSHF y POPF', () => {
+    expect(ah(exec('stc', 'lahf')) & 1).toBe(1);
+    expect(exec('mov ah,0', 'stc', 'sahf').flags.CF).toBe(false);
+    expect(exec('stc', 'pushf', 'clc', 'popf').flags.CF).toBe(true);
+  });
+
+  it('XLAT lee la tabla en DS:BX+AL', () => {
+    const m = program('mov bx,200', 'mov al,2', 'xlat');
+    text(m, 0x200, 'ABC');
+    for (let i = 0; i < 3; i++) step(m);
+    expect(al(m)).toBe(0x43);
+  });
+
+  it('LDS y LES cargan un puntero lejano', () => {
+    const m = program('les di,[304]', 'lds si,[300]');
+    m.mem.set([0x34, 0x12, 0x78, 0x56, 0xcd, 0xab, 0x00, 0x20], phys(0x073f, 0x300));
+    step(m);
+    expect([hex(m.regs[DI]), hex(m.sregs[ES])]).toEqual(['ABCD', '2000']);
+    step(m);
+    expect([hex(m.regs[SI]), hex(m.sregs[DS])]).toEqual(['1234', '5678']);
+  });
+
+  it('JMP a registro y JMP lejano por memoria', () => {
+    expect(exec('mov bx,200', 'jmp bx').ip).toBe(0x200);
+    const m = program('jmp far [300]');
+    m.mem.set([0x00, 0x04, 0x00, 0x10], phys(0x073f, 0x300));
+    step(m);
+    expect([hex(m.sregs[CS]), hex(m.ip)]).toEqual(['1000', '0400']);
+  });
+
+  it('CALL lejano directo y RETF', () => {
+    const m = program('call 073f:200');
+    m.mem.set([0xcb], phys(0x073f, 0x200)); // retf
+    step(m);
+    expect([hex(m.ip), hex(m.regs[SP])]).toEqual(['0200', '00F9']);
+    step(m);
+    expect([hex(m.sregs[CS]), hex(m.ip), hex(m.regs[SP])]).toEqual(['073F', '0105', '00FD']);
+  });
+
+  it('CALL lejano por memoria y RET con descarte de pila', () => {
+    const m = program('call far [300]');
+    m.mem.set([0x00, 0x02, 0x3f, 0x07], phys(0x073f, 0x300));
+    m.mem.set([0xc2, 0x02, 0x00], phys(0x073f, 0x200)); // ret 2
+    step(m);
+    expect(hex(m.ip)).toBe('0200');
+    step(m);
+    // RET cercano saca solo IP; el 2 descarta además el CS apilado
+    expect([hex(m.ip), hex(m.regs[SP])]).toEqual(['0104', '00FD']);
+  });
+
+  it('IRET recupera IP, CS y las banderas', () => {
+    const m = exec('mov ax,1', 'push ax', 'push cs', 'mov ax,200', 'push ax', 'iret');
+    expect([hex(m.ip), hex(m.regs[SP]), m.flags.CF]).toEqual(['0200', '00FD', true]);
+  });
+
+  it('LOOPZ sigue mientras ZF y LOOPNZ mientras no', () => {
+    const z = exec('mov cx,3', 'cmp ax,ax', 'loopz 100');
+    expect([z.regs[CX], hex(z.ip)]).toEqual([2, '0100']);
+    const nz = exec('mov cx,3', 'cmp ax,ax', 'loopnz 100');
+    expect([nz.regs[CX], hex(nz.ip)]).toEqual([2, '0107']);
+  });
+});
+
+describe('executor: cadenas', () => {
+  it('MOVSW avanza de a dos y con DF retrocede', () => {
+    const m = program('mov si,200', 'mov di,300', 'movsw', 'std', 'movsb');
+    text(m, 0x200, 'ABC');
+    for (let i = 0; i < 3; i++) step(m);
+    expect([readByte(m, 0x073f, 0x300), readByte(m, 0x073f, 0x301)]).toEqual([0x41, 0x42]);
+    expect([hex(m.regs[SI]), hex(m.regs[DI])]).toEqual(['0202', '0302']);
+    step(m);
+    step(m);
+    expect(readByte(m, 0x073f, 0x302)).toBe(0x43);
+    expect([hex(m.regs[SI]), hex(m.regs[DI])]).toEqual(['0201', '0301']);
+  });
+
+  it('REP STOSB llena CX bytes y LODSW lee una palabra', () => {
+    const m = program('mov al,7', 'mov di,400', 'mov cx,3', 'rep stosb', 'mov si,400', 'lodsw');
+    for (let i = 0; i < 6; i++) step(m);
+    expect([0, 1, 2, 3].map((i) => readByte(m, 0x073f, 0x400 + i))).toEqual([7, 7, 7, 0]);
+    expect([m.regs[CX], hex(m.regs[DI])]).toEqual([0, '0403']);
+    expect([hex(m.regs[AX]), hex(m.regs[SI])]).toEqual(['0707', '0402']);
+  });
+
+  it('REPNZ SCASB busca un byte y REPZ CMPSB se detiene en la primera diferencia', () => {
+    const scan = program('mov di,300', 'mov al,43', 'mov cx,4', 'repnz scasb');
+    text(scan, 0x300, 'ABCD');
+    for (let i = 0; i < 4; i++) step(scan);
+    expect([hex(scan.regs[DI]), scan.regs[CX], scan.flags.ZF]).toEqual(['0303', 1, true]);
+
+    const cmp = program('mov si,200', 'mov di,300', 'mov cx,2', 'repz cmpsb');
+    text(cmp, 0x200, 'AB');
+    text(cmp, 0x300, 'AC');
+    for (let i = 0; i < 4; i++) step(cmp);
+    expect([cmp.regs[CX], cmp.flags.ZF, hex(cmp.regs[SI])]).toEqual([0, false, '0202']);
   });
 });
