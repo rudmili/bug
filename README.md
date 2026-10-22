@@ -6,7 +6,7 @@ Simulador web del DEBUG de MS-DOS: escribe instrucciones assembler 8086, ejecút
 
 ## Qué es
 
-Reproduce el programa `DEBUG` de MS-DOS tal como se comporta dentro de DOSBox-X, para practicar assembler sin instalar nada. Se usa igual que el original: se escriben comandos de una letra en una terminal y las respuestas tienen el mismo formato.
+Reproduce el programa `DEBUG` de MS-DOS tal como se comporta dentro de DOSBox, para practicar assembler sin instalar nada. Se usa igual que el original: se escriben comandos de una letra en una terminal y las respuestas tienen el mismo formato.
 
 Junto a la terminal, un panel muestra el estado de la máquina después de cada comando:
 
@@ -67,7 +67,7 @@ Diferencias con el DEBUG real:
 - `t` sobre un `INT` resuelve la interrupción completa en un solo paso.
 - `g` se detiene tras 1.000.000 de instrucciones, para no congelar la pestaña.
 - No hay comandos de archivos ni de disco (`n`, `l`, `w`), ni `f`, `m`, `c`, `s`, `h` o `p`.
-- La memoria arranca en cero, así que el contenido después del programa no coincide con el de un equipo real.
+- La máquina arranca con los valores de una sesión concreta de DOSBox: segmento `073F`, `SP=00FD` y el PSP que deja DOS. El resto de la memoria arranca en cero, así que lo que haya más allá del programa puede no coincidir con el de otro equipo.
 
 ## Desarrollo
 
