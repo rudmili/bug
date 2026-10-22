@@ -62,6 +62,7 @@ export function createDebugSession(): DebugSession {
       }
       if (result.reset) {
         reset();
+        view = { ...view, restarted: true };
         return view;
       }
       const added = result.output.map((o): TerminalLine => ({ id: nextId++, kind: o.kind, text: o.text }));

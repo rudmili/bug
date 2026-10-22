@@ -189,6 +189,8 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
       rows: memoryRows(m, ds, dataAnchor & 0xfff0, next.hotBytes),
     },
     stack: stackView(m, input.asmLimit),
+    // Lo marca session cuando la línea fue `q`
+    restarted: false,
   };
   return { view, state: next };
 }

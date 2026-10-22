@@ -96,6 +96,7 @@ function baseView(lines: TerminalLine[]): DebugView {
       totalBytes: 0xfffe - 0x010c,
       position: 0,
     },
+    restarted: false,
   };
 }
 

@@ -105,6 +105,8 @@ export interface DebugView {
   code: MemoryWindowView;
   data: MemoryWindowView;
   stack: StackViewModel;
+  /** La última línea fue `q`: la máquina volvió al estado inicial y lo escrito antes ya no influye. */
+  restarted: boolean;
 }
 
 /** Lo único que la interfaz necesita de la lógica. */

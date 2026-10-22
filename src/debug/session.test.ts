@@ -68,6 +68,23 @@ describe('session', () => {
     expect(s.submit('r').lines[0].id).toBeGreaterThan(2);
   });
 
+  it('solo q marca la vista como reiniciada', () => {
+    const s = createDebugSession();
+    expect(s.getView().restarted).toBe(false);
+    expect(s.submit('r').restarted).toBe(false);
+    expect(s.submit('clear').restarted).toBe(false);
+    expect(s.submit('q').restarted).toBe(true);
+    expect(s.submit('r').restarted).toBe(false);
+  });
+
+  it('q dentro de a es una instrucción inválida, no un reinicio', () => {
+    const s = createDebugSession();
+    s.submit('a');
+    const v = s.submit('q');
+    expect(v.restarted).toBe(false);
+    expect(v.lines.at(-1)?.kind).toBe('error');
+  });
+
   it('un fallo interno se muestra en la terminal y la sesión sigue funcionando', () => {
     const s = createDebugSession();
     s.submit('r ax');
