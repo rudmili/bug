@@ -517,3 +517,32 @@ body {
   .hint__cmd .hint__key { width: 56px; }
   .hint__foot { font-size: 12px; }
 }
+
+/* ============================== FALLO DE LA INTERFAZ (ErrorBoundary) ============================== */
+.crash {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+.crash p { margin: 0; }
+.crash__title { color: var(--hot-text); }
+.crash__detail { color: var(--muted); overflow-wrap: anywhere; }
+.crash__button {
+  justify-self: start;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--cell);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.crash__button:hover { background: var(--tab-on); }
+.crash__button:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
