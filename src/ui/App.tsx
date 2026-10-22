@@ -29,16 +29,19 @@ function restore(createSession: CreateSession, log: string[]): DebugSession {
  *   - para ver el diseño:   <App createSession={createMockSession} />   (mock.ts)
  */
 export function App({ createSession }: { createSession: CreateSession }) {
-  const log = useCommandLog((s) => s.log);
+  const history = useCommandLog((s) => s.history);
+  const empty = useCommandLog((s) => s.log.length === 0 && s.history.length === 0);
   // El inicializador puede correr dos veces en StrictMode: es puro (sesión nueva y repetición), así que no importa
   const [session, setSession] = useState(() => restore(createSession, useCommandLog.getState().log));
   const [view, setView] = useState(() => session.getView());
-  // Las flechas recorren lo escrito, sin las líneas vacías
-  const history = log.filter((line) => line.trim() !== '');
 
   function submit(line: string) {
-    useCommandLog.getState().append(line);
-    setView(session.submit(line));
+    const store = useCommandLog.getState();
+    store.append(line);
+    const next = session.submit(line);
+    // Tras `q` solo hace falta guardar lo que venga después; las flechas conservan lo anterior
+    if (next.restarted) store.restart();
+    setView(next);
   }
 
   function reset() {
@@ -55,7 +58,7 @@ export function App({ createSession }: { createSession: CreateSession }) {
       <StatePanel view={view} />
       <Terminal lines={view.lines} prompt={view.prompt} history={history} onSubmit={submit}>
         <AppInfo className="info--float" />
-        <ResetButton disabled={log.length === 0} onReset={reset} />
+        <ResetButton disabled={empty} onReset={reset} />
       </Terminal>
     </div>
   );
