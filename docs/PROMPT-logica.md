@@ -1,10 +1,10 @@
 # Prompt de implementación: lógica del simulador DEBUG 8086
 
-Implementa en TypeScript la lógica de un simulador del programa DEBUG de MS-DOS, tal como se comporta dentro de DOSBox-X. La interfaz ya existe (React) y solo consume el contrato de `types.ts`. Tu trabajo es todo lo que hay detrás de `DebugSession`.
+Implementa en TypeScript la lógica de un simulador del programa DEBUG de MS-DOS, tal como se comporta dentro de DOSBox. La interfaz ya existe (React) y solo consume el contrato de `types.ts`. Tu trabajo es todo lo que hay detrás de `DebugSession`.
 
 ## 0. Reglas generales
 
-1. **Fidelidad.** Ante cualquier duda, se hace lo que hace DEBUG real en DOSBox-X. Las desviaciones permitidas están listadas en la sección 12 y son las únicas.
+1. **Fidelidad.** Ante cualquier duda, se hace lo que hace DEBUG real en DOSBox. Las desviaciones permitidas están listadas en la sección 12 y son las únicas.
 2. **TypeScript puro.** Sin React, sin DOM, sin dependencias en tiempo de ejecución. Debe poder ejecutarse en Node para los tests.
 3. **Todo es hexadecimal.** Lo que escribe el usuario y lo que se imprime. Las letras se imprimen en mayúsculas. La entrada no distingue mayúsculas de minúsculas.
 4. **La CPU ejecuta bytes, no texto.** `a` traduce texto a bytes y lo olvida. `t`, `g` y `u` leen los bytes de la memoria y los decodifican. Si un byte cambia con `e`, cambia la instrucción.
@@ -27,21 +27,21 @@ Contenido: ocho registros de 16 bits (AX, CX, DX, BX, SP, BP, SI, DI, en ese ord
 
 Acceso a mitades de 8 bits: AL, CL, DL, BL, AH, CH, DH, BH (en ese orden de codificación). Escribir una mitad no altera la otra.
 
-Estado inicial (el de DOSBox-X del usuario):
+Estado inicial (el de DEBUG en el DOSBox del usuario; la primera versión copiaba DOSBox-X):
 
 | Elemento | Valor |
 |---|---|
-| CS, DS, SS, ES | 0DAB |
+| CS, DS, SS, ES | 073F |
 | IP | 0100 |
-| SP | FFFE |
+| SP | 00FD |
 | AX, BX, CX, DX, BP, SI, DI | 0000 |
-| Banderas | NV UP EI NG NZ NA PO NC (IF=1, SF=1, el resto en 0) |
+| Banderas | NV UP EI PL NZ NA PO NC (IF=1, el resto en 0) |
 
 ## 2. Módulo `memory`
 
 - 1 MB (`Uint8Array` de 0x100000). Dirección física = `(segmento * 16 + desplazamiento) mod 0x100000`. El desplazamiento da la vuelta dentro de 16 bits.
 - Lectura y escritura de byte y de palabra. Las palabras son little endian: el byte bajo en la dirección menor.
-- Contenido inicial: todo en `00`, con dos excepciones dentro del segmento 0DAB: desplazamiento 0000 = `CD 20` (INT 20) y desplazamiento 0100 = `C3` (RET).
+- Contenido inicial: el PSP que deja DOS en 073F:0000 (INT 20, tope de memoria, tabla de archivos, versión 5.00, `CD 21 CB`, dos FCB vacíos y la línea de comandos vacía en 0080), ceros desde 0100 y los restos `34 00 2E 07` en 011C. Todo lo demás en `00`. Los bytes exactos están en `memory.ts`, copiados de `d 0 ff` y `d 100 17f`.
 - Registro de escrituras: cada escritura anota dirección física y valor anterior en una lista que `session` vacía y consulta después de cada comando. Es lo que usa la interfaz para resaltar cambios.
 
 ## 3. Módulo `flags`
@@ -158,9 +158,9 @@ Analiza una línea y la ejecuta contra la máquina. Devuelve las líneas a impri
 | Modo | Prompt | Cómo se entra | Cómo se sale |
 |---|---|---|---|
 | Comando | `-` | Es el inicial | |
-| Ensamblado | `0DAB:0100 ` (segmento:desplazamiento y un espacio) | `a` | Línea vacía |
+| Ensamblado | `073F:0100 ` (segmento:desplazamiento y un espacio) | `a` | Línea vacía |
 | Edición de registro | `:` | `r <registro>` | Cualquier línea (vacía conserva el valor) |
-| Edición de memoria | `0DAB:1100  69.` | `e <dirección>` sin lista | Línea vacía |
+| Edición de memoria | `073F:1100  69.` | `e <dirección>` sin lista | Línea vacía |
 
 **Comandos de la primera versión**
 
@@ -181,33 +181,33 @@ Rangos: `inicio fin` o `inicio L longitud`. Una dirección puede llevar segmento
 
 **Formato exacto de las salidas**
 
-Volcado de `r` y `t` (un espacio entre campos, como en DOSBox-X):
+Volcado de `r` y `t` (dos espacios entre registros y tres antes de las banderas, como en MS-DOS):
 
 ```
-AX=FF00 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000
-DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0108 NV UP EI NG NZ AC PE CY
-0DAB:0108 88260020      MOV     [2000],AH                    DS:2000=00
+AX=FF00  BX=0000  CX=0000  DX=0000  SP=00FD  BP=0000  SI=0000  DI=0000
+DS=073F  ES=073F  SS=073F  CS=073F  IP=0108   NV UP EI NG NZ AC PE CY
+073F:0108 88260020      MOV     [2000],AH                   DS:2000=00
 ```
 
 - Tercera línea: dirección, un espacio, los bytes sin separar rellenados hasta 14 columnas, y la instrucción.
-- Si la instrucción tiene un operando de memoria, se agrega al final `SEG:DESP=valor` con 2 o 4 dígitos según el tamaño, alineado a la derecha.
+- Si la instrucción tiene un operando de memoria, se agrega al final `SEG:DESP=valor` con 2 o 4 dígitos según el tamaño, alineado a la derecha para que termine en la columna 70.
 
 Salida de `u`: una línea por instrucción, con el mismo formato que la tercera línea del volcado, sin la nota de memoria.
 
 Salida de `d`: dirección, dos espacios, 16 bytes separados por espacio con un guion entre el octavo y el noveno, y la columna ASCII (punto para los no imprimibles).
 
 ```
-0DAB:0100  B4 08 80 C4 03 80 EC 0C-00 00 00 00 00 00 00 00   ................
+073F:0100  B4 08 80 C4 03 80 EC 0C-00 00 00 00 00 00 00 00   ................
 ```
 
 Errores: una línea con el acento circunflejo bajo la columna donde está el problema, seguido de ` Error`. El modo no cambia.
 
 ```
-0DAB:0100 -r
+073F:0100 -r
           ^ Error
 ```
 
-Las columnas exactas de la nota de memoria, del volcado `d` y del mensaje de error deben verificarse contra capturas de DOSBox-X antes de darlas por cerradas. Si una captura contradice este documento, manda la captura.
+Las columnas exactas de la nota de memoria, del volcado `d` y del mensaje de error deben verificarse contra capturas de DOSBox antes de darlas por cerradas. Si una captura contradice este documento, manda la captura.
 
 ## 10. Módulos `view` y `session`
 
@@ -225,17 +225,17 @@ Las columnas exactas de la nota de memoria, del volcado `d` y del mensaje de err
 - **Ventana de código**: 8 filas de 16 bytes del segmento CS. Empieza en la fila que contiene 0100 y solo se mueve cuando IP queda fuera de la ventana; entonces arranca en la fila que contiene IP. Marca `isIp` en el byte de CS:IP.
 - **Ventana de datos**: 8 filas del segmento DS. Se posiciona en la fila de la última escritura hecha por una instrucción en memoria que no sea de pila (PUSH, CALL, INT), o en la dirección del último `d` o `e`. Arranca en 0200. `captionValue` es esa dirección entre corchetes y `captionHot` es verdadero si la escritura ocurrió en el último comando.
 - **Bytes**: `changed` es verdadero para los bytes escritos por el último comando que modificó la máquina.
-- **Pila**: filas de mayor a menor dirección. Incluye hasta 4 palabras apiladas por encima de SP, la fila de SP y las 3 posiciones libres siguientes. `start` es FFFE. `limit` es la primera dirección después del último byte ensamblado con `a` (0101 si no se ensambló nada). `usedBytes` es `start − SP`, `totalBytes` es `start − limit` y `position` es el cociente entre ambos.
-- **Notas de pila**: la fila de FFFE con el valor inicial lleva "tope · retorno a DOS" cuando SP está ahí; la primera libre lleva "libre · próximo push"; las demás libres, "libre".
+- **Pila**: filas de mayor a menor dirección. Incluye hasta 4 palabras apiladas por encima de SP, la fila de SP y las 3 posiciones libres siguientes. `start` es 00FD, el SP inicial. La pila arranca dentro del PSP, debajo del programa, así que `limit` es 0000: el principio del segmento. `usedBytes` es `start − SP`, `totalBytes` es `start − limit` y `position` es el cociente entre ambos.
+- **Notas de pila**: la fila de 00FD con el valor inicial lleva "tope · retorno a DOS" cuando SP está ahí; la primera libre lleva "libre · próximo push"; las demás libres, "libre".
 
 ## 11. Casos de aceptación
 
-Cada caso parte del estado inicial. Los valores de segmento, SP y bandera de signo son los de DOSBox-X, no los del PDF del práctico.
+Cada caso parte del estado inicial. Los valores de segmento, SP y bandera de signo son los de DOSBox, no los del PDF del práctico.
 
 | Programa | Después del último `t` |
 |---|---|
 | `mov ah,8` / `add ah,3` / `sub ah,4` | AX=0700, IP=0108, `NV UP EI PL NZ NA PO NC` |
-| Ídem, tras el primer `t` | AX=0800, IP=0102, banderas sin cambios (`NG` sigue) |
+| Ídem, tras el primer `t` | AX=0800, IP=0102, banderas sin cambios (`PL` sigue) |
 | `mov ah,8` / `add ah,3` / `sub ah,c` | AX=FF00, `NV UP EI NG NZ AC PE CY` |
 | `mov ah,a` / `sub ah,a` | AX=0000, `NV UP EI PL ZR NA PE NC` |
 | `mov ah,a` / `add ah,a` | AX=1400, `NV UP EI PL NZ AC PE NC` |
@@ -288,12 +288,13 @@ pop dx
 int 20
 ```
 
-Tras los cuatro PUSH, SP=FFF6. Al final AX=D1D2, BX=D3D4, CX=D5D6, DX=D7D8 y SP=FFFE.
+Tras los cuatro PUSH, SP=00F5. Al final AX=D1D2, BX=D3D4, CX=D5D6, DX=D7D8 y SP=00FD.
 
 Otros:
 
-- Con el estado inicial, `r` muestra en la tercera línea `0DAB:0100 C3            RET`.
-- `u 100 106` con el estado inicial muestra el RET y tres `ADD     [BX+SI],AL`.
+- Con el estado inicial, `r` muestra en la tercera línea `073F:0100 0000          ADD     [BX+SI],AL` y la nota `DS:0000=CD`.
+- `u 100 106` con el estado inicial muestra cuatro `ADD     [BX+SI],AL`.
+- `g` con el estado inicial recorre los ceros, da la vuelta al segmento y termina en el INT 20 del PSP con `Program terminated normally`.
 - Escribir `-r` en modo ensamblado produce `^ Error` y la dirección no avanza.
 - `r ip` seguido de `0100` deja IP=0100; seguido de una línea vacía no lo cambia.
 - Cambiar con `e` un byte de una instrucción ya ensamblada cambia lo que muestra `u` y lo que ejecuta `t`.
