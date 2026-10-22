@@ -1,3 +1,5 @@
+import type { RegisterName } from './types';
+
 /** Estado de la máquina 8086: registros, banderas y memoria. */
 
 /** Registros generales en orden de codificación. */
@@ -98,4 +100,28 @@ export interface Snapshot {
 
 export function snapshot(m: Machine): Snapshot {
   return { regs: m.regs.slice(), sregs: m.sregs.slice(), ip: m.ip, flags: { ...m.flags } };
+}
+
+/** Los trece registros que se nombran en `r`, en el orden en que los muestra el panel. */
+export const REGISTER_NAMES: readonly RegisterName[] = ['AX', 'BX', 'CX', 'DX', 'SP', 'BP', 'SI', 'DI', 'DS', 'ES', 'SS', 'CS', 'IP'];
+
+export function isRegisterName(name: string): name is RegisterName {
+  return (REGISTER_NAMES as readonly string[]).includes(name);
+}
+
+/** Valor de un registro por su nombre, en la máquina o en una copia. */
+export function readRegister(s: Pick<Snapshot, 'regs' | 'sregs' | 'ip'>, name: RegisterName): number {
+  if (name === 'IP') return s.ip;
+  const r = (REG16 as readonly string[]).indexOf(name);
+  return r >= 0 ? s.regs[r] : s.sregs[(SREG as readonly string[]).indexOf(name)];
+}
+
+export function writeRegister(m: Machine, name: RegisterName, value: number): void {
+  if (name === 'IP') {
+    m.ip = value;
+    return;
+  }
+  const r = (REG16 as readonly string[]).indexOf(name);
+  if (r >= 0) m.regs[r] = value;
+  else m.sregs[(SREG as readonly string[]).indexOf(name)] = value;
 }

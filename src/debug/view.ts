@@ -1,7 +1,7 @@
 import { FLAG_CODES } from './flags';
 import { hex2, hex4, toSigned16 } from './hex';
 import { phys, readWord } from './memory';
-import { CS, DS, INITIAL_SP, REG16, SP, SREG, SS } from './state';
+import { CS, DS, INITIAL_SP, REGISTER_NAMES, SP, SS, readRegister } from './state';
 import type { Machine, Snapshot, WriteRecord } from './state';
 import type {
   DebugView,
@@ -41,7 +41,6 @@ export function createViewState(): ViewState {
   };
 }
 
-const REGISTER_ORDER: RegisterName[] = ['AX', 'BX', 'CX', 'DX', 'SP', 'BP', 'SI', 'DI', 'DS', 'ES', 'SS', 'CS', 'IP'];
 const FLAG_ORDER: FlagKey[] = ['OF', 'DF', 'IF', 'SF', 'ZF', 'AF', 'PF', 'CF'];
 const FLAG_LABELS: Record<FlagKey, string> = {
   OF: 'Desb.',
@@ -58,12 +57,6 @@ const ROWS = 8;
 /** La pila vacía empieza en el SP inicial y puede crecer hasta el principio del segmento, pisando el PSP. */
 const STACK_START = INITIAL_SP;
 const STACK_LIMIT = 0x0000;
-
-function registerValue(s: Pick<Snapshot, 'regs' | 'sregs' | 'ip'>, name: RegisterName): number {
-  if (name === 'IP') return s.ip;
-  const r = REG16.indexOf(name as (typeof REG16)[number]);
-  return r >= 0 ? s.regs[r] : s.sregs[SREG.indexOf(name as (typeof SREG)[number])];
-}
 
 function memoryRows(m: Machine, seg: number, start: number, hot: ReadonlySet<number>): MemoryRowView[] {
   const ip = phys(m.sregs[CS], m.ip);
@@ -131,7 +124,7 @@ export interface BuildInput {
 export function buildView(input: BuildInput): { view: DebugView; state: ViewState } {
   const { machine: m, prev, writes, state } = input;
 
-  const changedRegs = new Set(REGISTER_ORDER.filter((n) => registerValue(m, n) !== registerValue(prev, n)));
+  const changedRegs = new Set(REGISTER_NAMES.filter((n) => readRegister(m, n) !== readRegister(prev, n)));
   const changedFlags = new Set(FLAG_ORDER.filter((k) => m.flags[k] !== prev.flags[k]));
   const modified = changedRegs.size > 0 || changedFlags.size > 0 || writes.length > 0;
 
@@ -157,9 +150,9 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
     ? { codeStart, dataAnchor, dataHot, changedRegs, changedFlags, hotBytes: new Set(writes.map((w) => w.addr)) }
     : { ...state, codeStart, dataAnchor, dataHot };
 
-  const registers: RegisterView[] = REGISTER_ORDER.map((name) => ({
+  const registers: RegisterView[] = REGISTER_NAMES.map((name) => ({
     name,
-    value: hex4(registerValue(m, name)),
+    value: hex4(readRegister(m, name)),
     changed: next.changedRegs.has(name),
   }));
   const flags: FlagView[] = FLAG_ORDER.map((key) => ({

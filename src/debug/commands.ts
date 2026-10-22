@@ -8,8 +8,9 @@ import { flagsText } from './flags';
 import { hex2, hex4, parseHex } from './hex';
 import { manual } from './manual';
 import { readByte, readWord, writeByte } from './memory';
-import { CS, DS, REG16, SREG } from './state';
+import { CS, DS, REG16, SREG, isRegisterName, readRegister, writeRegister } from './state';
 import type { Machine } from './state';
+import type { RegisterName } from './types';
 
 /** Los comandos de DEBUG: analizan una línea, la ejecutan contra la máquina y devuelven qué imprimir. */
 
@@ -34,10 +35,6 @@ export interface CommandState {
   /** Registro que se edita con `r <registro>`. */
   editReg: RegisterName | null;
 }
-
-export type RegisterName = (typeof REGISTER_NAMES)[number];
-
-const REGISTER_NAMES = ['AX', 'BX', 'CX', 'DX', 'SP', 'BP', 'SI', 'DI', 'DS', 'ES', 'SS', 'CS', 'IP'] as const;
 
 export interface OutLine {
   kind: 'output' | 'error';
@@ -375,10 +372,7 @@ function runRegister(m: Machine, state: CommandState, line: string, prompt: stri
   }
   try {
     if (tokens.length > 1) throw new CommandError(tokens[1].col);
-    const value = hexValue(tokens[0]);
-    if (name === 'IP') m.ip = value;
-    else if (REG16.includes(name as (typeof REG16)[number])) m.regs[REG16.indexOf(name as (typeof REG16)[number])] = value;
-    else m.sregs[SREG.indexOf(name as (typeof SREG)[number])] = value;
+    writeRegister(m, name, hexValue(tokens[0]));
   } catch (e) {
     if (!(e instanceof CommandError)) throw e;
     state.mode = 'command';
@@ -439,15 +433,10 @@ function runCommand(m: Machine, state: CommandState, line: string): RunResult {
       if (tokens.length === 0) return { output: registerDump(m).map(out) };
       if (tokens.length > 1) throw new CommandError(tokens[1].col);
       const name = tokens[0].text.toUpperCase() === 'PC' ? 'IP' : tokens[0].text.toUpperCase();
-      if (!(REGISTER_NAMES as readonly string[]).includes(name)) throw new CommandError(tokens[0].col);
-      const reg = name as RegisterName;
-      const value =
-        reg === 'IP' ? m.ip
-          : REG16.includes(reg as (typeof REG16)[number]) ? m.regs[REG16.indexOf(reg as (typeof REG16)[number])]
-            : m.sregs[SREG.indexOf(reg as (typeof SREG)[number])];
-      state.editReg = reg;
+      if (!isRegisterName(name)) throw new CommandError(tokens[0].col);
+      state.editReg = name;
       state.mode = 'register';
-      return { output: [out(`${reg} ${hex4(value)}`)] };
+      return { output: [out(`${name} ${hex4(readRegister(m, name))}`)] };
     }
     case 't':
       return { output: trace(m, tokens) };
