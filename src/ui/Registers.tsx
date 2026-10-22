@@ -29,7 +29,7 @@ function whereData(high: string, low: string, [h, l]: [string, string]): string 
 
 export function Registers({ registers }: { registers: RegisterView[] }) {
   return (
-    <section className="sec sec--plain" data-tab="reg" aria-label="Registros">
+    <section id="sec-regs" className="sec sec--plain" data-tab="reg" aria-label="Registros">
       <header className="sec__head">
         <h2 className="sec__title">Registros</h2>
       </header>

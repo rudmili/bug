@@ -100,11 +100,36 @@ describe('App', () => {
     expect(useCommandLog.getState()).toMatchObject({ log: [], history: [] });
   });
 
-  it('las pestañas del panel marcan la sección activa', async () => {
+  it('las pestañas siguen el patrón de WAI-ARIA', async () => {
     const { user } = setup();
-    const memory = screen.getByRole('button', { name: 'Memoria' });
-    await user.click(memory);
-    expect(memory.getAttribute('aria-pressed')).toBe('true');
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['Registros', 'Memoria', 'Pila']);
+    expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
+    expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+    expect(tabs[1].getAttribute('aria-controls')).toBe('sec-code sec-data');
+
+    await user.click(tabs[1]);
+    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
     expect(screen.getByLabelText('Estado de la máquina').dataset.active).toBe('mem');
+
+    await user.keyboard('{ArrowRight}');
+    expect(document.activeElement).toBe(tabs[2]);
+    expect(tabs[2].getAttribute('aria-selected')).toBe('true');
+    await user.keyboard('{ArrowRight}');
+    expect(document.activeElement).toBe(tabs[0]);
+    await user.keyboard('{End}');
+    expect(document.activeElement).toBe(tabs[2]);
+    await user.keyboard('{Home}{ArrowLeft}');
+    expect(tabs[2].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('Escape oculta el popup del registro con foco hasta que el foco se va', async () => {
+    const { user } = setup();
+    const ax = screen.getByText('AX', { selector: '.reg__name' }).parentElement!;
+    ax.focus();
+    await user.keyboard('{Escape}');
+    expect(ax.dataset.tipHidden).toBe('');
+    await user.tab();
+    expect(ax.dataset.tipHidden).toBeUndefined();
   });
 });

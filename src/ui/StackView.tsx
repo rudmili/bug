@@ -3,7 +3,7 @@ import type { StackViewModel } from '../debug/types';
 
 export function StackView({ stack }: { stack: StackViewModel }) {
   return (
-    <section className="sec sec--stack" data-tab="pila" aria-label="Pila">
+    <section id="sec-stack" className="sec sec--stack" data-tab="pila" aria-label="Pila">
       <header className="sec__head">
         <h2 className="sec__title">Pila</h2>
         <span className="sec__meta">

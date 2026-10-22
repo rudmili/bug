@@ -129,8 +129,9 @@ body {
   background: var(--panel);
 }
 
-/* Pestañas: solo en móvil */
+/* Pestañas: solo en móvil. La versión queda fuera del tablist, que solo admite pestañas */
 .panel__tabs { display: flex; gap: 4px; }
+.panel__tablist { flex: 1 1 auto; display: flex; gap: 4px; min-width: 0; }
 .panel__tab {
   flex: 1 1 0;
   height: 44px;
@@ -143,7 +144,7 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
-.panel__tab[aria-pressed='true'] { background: var(--tab-on); color: var(--text); }
+.panel__tab[aria-selected='true'] { background: var(--tab-on); color: var(--text); }
 .panel__tab:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
 
 /* En móvil las columnas no existen: sus hijos pasan a ser hijos del panel */
@@ -239,6 +240,9 @@ body {
 .flag:nth-last-child(-n + 2) .tip { left: auto; right: 0; transform: none; }
 .reg:hover .tip, .reg:focus .tip,
 .flag:hover .tip, .flag:focus .tip { opacity: 1; visibility: visible; }
+/* Escape lo oculta hasta que el cursor y el foco se van (StatePanel) */
+.reg[data-tip-hidden] .tip,
+.flag[data-tip-hidden] .tip { opacity: 0; visibility: hidden; }
 .tip__title { color: var(--text); font-size: 12px; }
 .tip__title b { color: var(--cmd); font-weight: 600; }
 .tip__code { font-family: var(--font-mono); color: var(--muted); }

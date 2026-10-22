@@ -8,9 +8,9 @@ function byteClass(b: ByteView): string {
   return cls;
 }
 
-export function MemoryWindow({ window: win }: { window: MemoryWindowView }) {
+export function MemoryWindow({ id, window: win }: { id: string; window: MemoryWindowView }) {
   return (
-    <section className="sec sec--mem" data-tab="mem" aria-label={win.title}>
+    <section id={id} className="sec sec--mem" data-tab="mem" aria-label={win.title}>
       <header className="sec__head">
         <h2 className="sec__title">{win.title}</h2>
         <span className="sec__meta">

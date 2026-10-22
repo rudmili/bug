@@ -22,7 +22,7 @@ const FLAG_HELP: Record<FlagCode, { name: string; state: string; detail: string 
 
 export function Flags({ flags }: { flags: FlagView[] }) {
   return (
-    <section className="sec sec--plain" data-tab="reg" aria-label="Banderas">
+    <section id="sec-flags" className="sec sec--plain" data-tab="reg" aria-label="Banderas">
       <header className="sec__head">
         <h2 className="sec__title">Banderas</h2>
       </header>
