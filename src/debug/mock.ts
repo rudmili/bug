@@ -18,14 +18,14 @@ const REGISTERS: RegisterView[] = [
   { name: 'BX', value: '0000', changed: false },
   { name: 'CX', value: '0000', changed: false },
   { name: 'DX', value: '0000', changed: false },
-  { name: 'SP', value: 'FFFE', changed: false },
+  { name: 'SP', value: '00FD', changed: false },
   { name: 'BP', value: '0000', changed: false },
   { name: 'SI', value: '0000', changed: false },
   { name: 'DI', value: '0000', changed: false },
-  { name: 'DS', value: '0DAB', changed: false },
-  { name: 'ES', value: '0DAB', changed: false },
-  { name: 'SS', value: '0DAB', changed: false },
-  { name: 'CS', value: '0DAB', changed: false },
+  { name: 'DS', value: '073F', changed: false },
+  { name: 'ES', value: '073F', changed: false },
+  { name: 'SS', value: '073F', changed: false },
+  { name: 'CS', value: '073F', changed: false },
   { name: 'IP', value: '0108', changed: true },
 ];
 
@@ -83,17 +83,17 @@ function baseView(lines: TerminalLine[]): DebugView {
       rows: rows(0x2000, () => byte(0)),
     },
     stack: {
-      pointer: 'SS:SP 0DAB:FFFE',
+      pointer: 'SS:SP 073F:00FD',
       rows: [
-        { address: 'FFFE', value: '0000', isSp: true, note: 'tope · retorno a DOS' },
-        { address: 'FFFC', value: '0000', isSp: false, note: 'libre · próximo push' },
-        { address: 'FFFA', value: '0000', isSp: false, note: 'libre' },
-        { address: 'FFF8', value: '0000', isSp: false, note: 'libre' },
+        { address: '00FD', value: '0000', isSp: true, note: 'tope · retorno a DOS' },
+        { address: '00FB', value: '0000', isSp: false, note: 'libre · próximo push' },
+        { address: '00F9', value: '0000', isSp: false, note: 'libre' },
+        { address: '00F7', value: '0000', isSp: false, note: 'libre' },
       ],
-      start: 'FFFE',
-      limit: '010C',
+      start: '00FD',
+      limit: '0000',
       usedBytes: 0,
-      totalBytes: 0xfffe - 0x010c,
+      totalBytes: 0xfd,
       position: 0,
     },
     restarted: false,
@@ -104,9 +104,9 @@ export function createMockSession(): DebugSession {
   let nextId = 0;
   let view = baseView([
     { id: nextId++, kind: 'command', text: '-r' },
-    { id: nextId++, kind: 'output', text: 'AX=FF00 BX=0000 CX=0000 DX=0000 SP=FFFE BP=0000 SI=0000 DI=0000' },
-    { id: nextId++, kind: 'output', text: 'DS=0DAB ES=0DAB SS=0DAB CS=0DAB IP=0108 NV UP EI NG NZ AC PE CY' },
-    { id: nextId++, kind: 'output', text: '0DAB:0108 88260020      MOV     [2000],AH                    DS:2000=00' },
+    { id: nextId++, kind: 'output', text: 'AX=FF00  BX=0000  CX=0000  DX=0000  SP=00FD  BP=0000  SI=0000  DI=0000' },
+    { id: nextId++, kind: 'output', text: 'DS=073F  ES=073F  SS=073F  CS=073F  IP=0108   NV UP EI NG NZ AC PE CY' },
+    { id: nextId++, kind: 'output', text: '073F:0108 88260020      MOV     [2000],AH                   DS:2000=00' },
   ]);
 
   return {
