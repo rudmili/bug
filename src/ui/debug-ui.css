@@ -82,6 +82,7 @@ body {
   line-height: 1.55;
   white-space: pre;
 }
+.term__out:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
 /* El historial se apoya abajo, como en una terminal real */
 .term__out > :first-child { margin-top: auto; }
 

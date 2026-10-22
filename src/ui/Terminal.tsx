@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode, SubmitEvent } from 'react';
 import type { TerminalLine } from '../debug/types';
 import { TerminalHint } from './TerminalHint';
+import { announcement } from './announcement';
 
 interface TerminalProps {
   lines: TerminalLine[];
@@ -57,7 +58,8 @@ export function Terminal({ lines, prompt, onSubmit, history, children }: Termina
   return (
     <main className="term" onClick={focusInput}>
       {children}
-      <div className="term__out" ref={outRef} role="log" aria-live="polite" aria-label="Salida de DEBUG">
+      {/* tabIndex: la salida se puede desplazar con el teclado */}
+      <div className="term__out" ref={outRef} role="region" aria-label="Salida de DEBUG" tabIndex={0}>
         {/* Con la terminal vacía (al abrir y tras `q`) se muestra la guía de comandos */}
         {lines.length === 0 && <TerminalHint />}
         {lines.map((line) => (
@@ -66,6 +68,9 @@ export function Terminal({ lines, prompt, onSubmit, history, children }: Termina
           </div>
         ))}
       </div>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement(lines)}
+      </p>
       <form className="term__input-row" onSubmit={handleSubmit}>
         <label className="term__prompt" htmlFor="debug-cmd">
           {prompt}

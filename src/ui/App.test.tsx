@@ -162,4 +162,10 @@ describe('App', () => {
     await user.tab();
     expect(ax.dataset.tipHidden).toBeUndefined();
   });
+
+  it('el lector de pantalla oye la respuesta del último comando', async () => {
+    const { type } = setup();
+    await type('r ax');
+    expect(document.querySelector('[aria-live]')?.textContent).toBe('AX 0000');
+  });
 });
