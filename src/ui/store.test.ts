@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MAX_HISTORY, useCommandLog } from './store';
 
@@ -28,6 +29,12 @@ describe('registro de comandos', () => {
     const { history } = useCommandLog.getState();
     expect(history).toHaveLength(MAX_HISTORY);
     expect(history[0]).toBe('r 1');
+  });
+
+  it('migra lo guardado por la versión 1, que usaba log también como historial', async () => {
+    localStorage.setItem('debug8086-commands', JSON.stringify({ state: { log: ['a', 'nop', '', 'r'] }, version: 1 }));
+    await useCommandLog.persist.rehydrate();
+    expect(useCommandLog.getState()).toMatchObject({ log: ['a', 'nop', '', 'r'], history: ['a', 'nop', 'r'] });
   });
 
   it('clear borra todo', () => {
