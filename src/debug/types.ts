@@ -22,10 +22,15 @@ export interface RegisterView {
 
 export type FlagKey = 'OF' | 'DF' | 'IF' | 'SF' | 'ZF' | 'AF' | 'PF' | 'CF';
 
+/** Las dos letras con que DEBUG muestra una bandera, apagada o encendida. */
+export type FlagCode =
+  | 'NV' | 'OV' | 'UP' | 'DN' | 'DI' | 'EI' | 'PL' | 'NG'
+  | 'NZ' | 'ZR' | 'NA' | 'AC' | 'PO' | 'PE' | 'NC' | 'CY';
+
 export interface FlagView {
   key: FlagKey;
   /** Las dos letras de DEBUG según el estado actual: "NV" u "OV", "PL" o "NG", etc. */
-  code: string;
+  code: FlagCode;
   /** Nombre corto en español: "Signo", "Cero", "Acarreo"… */
   label: string;
   changed: boolean;

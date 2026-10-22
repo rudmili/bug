@@ -1,4 +1,5 @@
 import type { Flags } from './state';
+import type { FlagCode, FlagKey } from './types';
 
 /** Cálculo de banderas. Funciones puras: reciben operandos, resultado y tamaño, devuelven las banderas que cambian. */
 
@@ -129,7 +130,7 @@ export function flagsText(f: Flags): string {
 }
 
 /** Las dos letras de una sola bandera, para la interfaz. */
-export const FLAG_CODES: Record<'OF' | 'DF' | 'IF' | 'SF' | 'ZF' | 'AF' | 'PF' | 'CF', [string, string]> = {
+export const FLAG_CODES: Record<FlagKey, readonly [off: FlagCode, on: FlagCode]> = {
   OF: ['NV', 'OV'],
   DF: ['UP', 'DN'],
   IF: ['DI', 'EI'],
