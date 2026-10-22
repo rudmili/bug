@@ -1,4 +1,11 @@
 import { StrictMode } from 'react'
+// Fuentes servidas desde el propio sitio (solo el alfabeto latino): sin bloquear la carga en otro dominio
+import '@fontsource/jetbrains-mono/latin-400.css'
+import '@fontsource/jetbrains-mono/latin-500.css'
+import '@fontsource/jetbrains-mono/latin-700.css'
+import '@fontsource/ibm-plex-sans/latin-400.css'
+import '@fontsource/ibm-plex-sans/latin-500.css'
+import '@fontsource/ibm-plex-sans/latin-600.css'
 import { createRoot } from 'react-dom/client'
 import { App } from './ui/App'
 import { ErrorBoundary } from './ui/ErrorBoundary'
