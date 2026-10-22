@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
@@ -35,4 +36,14 @@ export default defineConfig({
       transformIndexHtml: () => [{ tag: 'meta', attrs: { name: 'version', content: appVersion }, injectTo: 'head' }],
     },
   ],
+  test: {
+    // La lógica corre en Node; los tests de la interfaz piden jsdom con un comentario al principio del archivo
+    environment: 'node',
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      // mock.ts es una sesión falsa para trabajar en el diseño, no se usa en la aplicación
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/debug/mock.ts', 'src/env.d.ts'],
+    },
+  },
 })
