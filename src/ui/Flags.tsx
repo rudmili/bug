@@ -1,7 +1,7 @@
-import type { FlagView } from '../debug/types';
+import type { FlagCode, FlagView } from '../debug/types';
 
 /** Lo que significa cada código de DEBUG: nombre completo, estado y una línea de explicación. */
-const FLAG_HELP: Record<string, { name: string; state: string; detail: string }> = {
+const FLAG_HELP: Record<FlagCode, { name: string; state: string; detail: string }> = {
   OV: { name: 'Desbordamiento', state: 'sí', detail: 'El resultado con signo no cabe en el destino.' },
   NV: { name: 'Desbordamiento', state: 'no', detail: 'El resultado con signo cabe en el destino.' },
   DN: { name: 'Dirección', state: 'abajo', detail: 'Las instrucciones de cadena decrementan SI y DI.' },
@@ -35,19 +35,17 @@ export function Flags({ flags }: { flags: FlagView[] }) {
             <div
               key={f.key}
               className={f.changed ? 'flag flag--hot' : 'flag'}
-              tabIndex={help ? 0 : undefined}
-              aria-describedby={help ? tipId : undefined}
+              tabIndex={0}
+              aria-describedby={tipId}
             >
               <span className="flag__code">{f.code}</span>
               <span className="flag__label">{f.label}</span>
-              {help && (
-                <span className="tip" id={tipId} role="tooltip">
-                  <span className="tip__title">
-                    {help.name}: <b>{help.state}</b> <span className="tip__code">({f.code})</span>
-                  </span>
-                  <span className="tip__detail">{help.detail}</span>
+              <span className="tip" id={tipId} role="tooltip">
+                <span className="tip__title">
+                  {help.name}: <b>{help.state}</b> <span className="tip__code">({f.code})</span>
                 </span>
-              )}
+                <span className="tip__detail">{help.detail}</span>
+              </span>
             </div>
           );
         })}
