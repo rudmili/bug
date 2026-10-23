@@ -17,17 +17,19 @@ type Request = WithoutId<SessionRequest>;
 
 function clientFor(send: (request: SessionRequest) => void) {
   let nextId = 0;
-  const pending = new Map<number, { resolve: (view: DebugView) => void; reject: (error: unknown) => void }>();
+  const pending = new Map<number, { resolve: (view: DebugView | null) => void; reject: (error: unknown) => void }>();
   const call = (request: Request) =>
-    new Promise<DebugView>((resolve, reject) => {
+    new Promise<DebugView | null>((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve, reject });
       send({ ...request, id } as SessionRequest);
     });
+  // Solo `window` puede responder null (dirección no válida)
+  const view = (request: Request) => call(request) as Promise<DebugView>;
   const client: SessionClient = {
-    start: (lines) => call({ type: 'start', lines }),
-    submit: (line) => call({ type: 'submit', line }),
-    reset: () => call({ type: 'reset' }),
+    start: (lines) => view({ type: 'start', lines }),
+    submit: (line) => view({ type: 'submit', line }),
+    reset: () => view({ type: 'reset' }),
   };
   return {
     client,

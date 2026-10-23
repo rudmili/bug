@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_LINES, createDebugSession } from './session';
+import type { DebugView } from './types';
 
 // Simula un bug del simulador: la línea "boom" hace fallar a commands.run
 vi.mock('./commands', async (importOriginal) => {
@@ -132,5 +133,80 @@ describe('session: repetir el registro de comandos', () => {
     for (const line of log) first.submit(line);
     for (const line of log) second.submit(line);
     expect(second.getView()).toEqual(first.getView());
+  });
+});
+
+describe('session: navegar la memoria', () => {
+  const rows = (v: DebugView, w: 'code' | 'data') => v[w].rows.map((r) => r.address);
+
+  it('las páginas avanzan y retroceden, dando la vuelta al segmento, y la ventana queda fija', () => {
+    const s = createDebugSession();
+    let v = s.moveWindow('code', { by: 0x80 })!;
+    expect(rows(v, 'code')[0]).toBe('0180');
+    expect(v.code).toMatchObject({ pinned: true, caption: 'fija', captionValue: '0180' });
+    v = s.moveWindow('code', { by: -0x200 })!;
+    expect(rows(v, 'code')[0]).toBe('FF80');
+    v = s.moveWindow('data', { by: -0x40 })!;
+    expect(rows(v, 'data')[0]).toBe('01C0');
+    expect(v.data).toMatchObject({ pinned: true, caption: 'fija', captionValue: '[01C0]' });
+  });
+
+  it('fijada, la ventana de código no sigue a IP; al pedir seguir vuelve a CS:IP', () => {
+    const s = createDebugSession();
+    s.submit('a 300');
+    s.submit('nop');
+    s.submit('');
+    s.moveWindow('code', { address: '1000' });
+    let v = s.submit('t =300');
+    expect(rows(v, 'code')[0]).toBe('1000');
+    v = s.moveWindow('code', { follow: true })!;
+    expect(rows(v, 'code')[0]).toBe('0300');
+    expect(v.code).toMatchObject({ pinned: false, caption: 'sigue a CS:IP', captionValue: '0301' });
+  });
+
+  it('fijada, la ventana de datos no sigue al programa, pero d o e la sueltan y la mueven', () => {
+    const s = createDebugSession();
+    s.submit('a');
+    s.submit('mov byte [2000],1');
+    s.submit('');
+    s.moveWindow('data', { address: '500' });
+    let v = s.submit('t');
+    expect(v.data.captionValue).toBe('[0500]');
+    v = s.submit('d 900 l 1');
+    expect(v.data).toMatchObject({ pinned: false, captionValue: '[0900]' });
+  });
+
+  it('la ventana de datos acepta otro segmento; la de código, solo CS', () => {
+    const s = createDebugSession();
+    s.submit('e 1000:20 aa');
+    const v = s.moveWindow('data', { address: '1000:25' })!;
+    expect(v.data.captionValue).toBe('[1000:0025]');
+    expect(v.data.rows[0].bytes[0]).toMatchObject({ value: 'AA' });
+    expect(s.moveWindow('data', { address: 'ds:25' })!.data.captionValue).toBe('[0025]');
+    expect(s.moveWindow('code', { address: 'es:100' })).not.toBeNull();
+    expect(s.moveWindow('code', { address: '1000:100' })).toBeNull();
+  });
+
+  it('una dirección inválida no cambia nada', () => {
+    const s = createDebugSession();
+    const before = s.getView();
+    for (const address of ['', 'xyz', '1 2', '10000', 'zz:100']) expect(s.moveWindow('data', { address })).toBeNull();
+    expect(s.getView()).toBe(before);
+  });
+
+  it('moverse conserva los resaltados del último comando', () => {
+    const s = createDebugSession();
+    s.submit('r ax');
+    s.submit('1234');
+    const v = s.moveWindow('data', { by: 0x80 })!;
+    expect(v.registers.find((r) => r.name === 'AX')?.changed).toBe(true);
+  });
+
+  it('q vuelve las ventanas al modo automático', () => {
+    const s = createDebugSession();
+    s.moveWindow('code', { by: 0x80 });
+    s.moveWindow('data', { by: 0x80 });
+    const v = s.submit('q');
+    expect([v.code.pinned, v.data.pinned]).toEqual([false, false]);
   });
 });

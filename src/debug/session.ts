@@ -3,8 +3,8 @@ import type { CommandState, RunResult } from './commands';
 import { bootMachine, clearWrites } from './memory';
 import { snapshot } from './state';
 import type { Machine } from './state';
-import type { DebugSession, DebugView, TerminalLine } from './types';
-import { buildView, createViewState } from './view';
+import type { DebugSession, DebugView, MemoryTarget, MemoryWindowName, TerminalLine } from './types';
+import { buildView, createViewState, moveWindow } from './view';
 import type { ViewState } from './view';
 
 /** Punto de entrada de la lógica: implementa el contrato que consume la interfaz. */
@@ -29,11 +29,12 @@ export function createDebugSession(): DebugSession {
     view = render(snapshot(machine), undefined);
   }
 
-  function render(prev: ReturnType<typeof snapshot>, dataFocus: number | undefined): DebugView {
+  /** `writes` por defecto: las del último comando. Sin escrituras, la vista conserva los resaltados que tenía. */
+  function render(prev: ReturnType<typeof snapshot>, dataFocus: number | undefined, writes = machine.writes): DebugView {
     const built = buildView({
       machine,
       prev,
-      writes: machine.writes,
+      writes,
       dataFocus,
       lines,
       prompt: promptFor(machine, commands),
@@ -68,6 +69,14 @@ export function createDebugSession(): DebugSession {
       // `clear` deja la terminal vacía (vuelve a verse la guía de comandos), sin el eco de la línea
       lines = result.clear ? [] : [...lines, echo, ...added].slice(-MAX_LINES);
       view = render(prev, result.dataFocus);
+      return view;
+    },
+    moveWindow(window: MemoryWindowName, to: MemoryTarget): DebugView | null {
+      const moved = moveWindow(machine, viewState, window, to);
+      if (!moved) return null;
+      viewState = moved;
+      // Nada cambió en la máquina: sin escrituras ni diferencias, los resaltados del último comando siguen
+      view = render(snapshot(machine), undefined, []);
       return view;
     },
   };

@@ -1,5 +1,5 @@
 import { createDebugSession } from './session';
-import type { DebugSession, DebugView } from './types';
+import type { DebugSession, DebugView, MemoryTarget, MemoryWindowName } from './types';
 
 /**
  * Protocolo para usar la sesión desde otro hilo (worker.ts). Un `g` largo o la repetición de los
@@ -11,11 +11,13 @@ export type SessionRequest =
   | { id: number; type: 'start'; lines: string[] }
   | { id: number; type: 'submit'; line: string }
   /** Sesión nueva, como al abrir sin nada guardado. */
-  | { id: number; type: 'reset' };
+  | { id: number; type: 'reset' }
+  | { id: number; type: 'window'; window: MemoryWindowName; to: MemoryTarget };
 
 export interface SessionResponse {
   id: number;
-  view: DebugView;
+  /** null solo en `window`, cuando la dirección no es válida. */
+  view: DebugView | null;
 }
 
 /** Atiende los pedidos en orden; cada respuesta lleva el id del pedido. */
@@ -35,6 +37,8 @@ export function createSessionHost(createSession: () => DebugSession = createDebu
         case 'reset':
           session = createSession();
           return { id: request.id, view: session.getView() };
+        case 'window':
+          return { id: request.id, view: session.moveWindow(request.window, request.to) };
       }
     },
   };

@@ -126,6 +126,18 @@ function parseAddress(m: Machine, token: Token, defaultSeg: number): Address {
   return { seg, off: hexValue({ text: token.text.slice(colon + 1), col: token.col + colon + 1 }) };
 }
 
+/** Dirección escrita fuera de un comando (el campo "ir a" de las ventanas de memoria), o null si no es válida. */
+export function addressFromText(m: Machine, text: string, defaultSeg: number): Address | null {
+  const trimmed = text.trim();
+  if (trimmed === '' || /\s/.test(trimmed)) return null;
+  try {
+    return parseAddress(m, { text: trimmed, col: 0 }, defaultSeg);
+  } catch (e) {
+    if (e instanceof CommandError) return null;
+    throw e;
+  }
+}
+
 /** Rango al principio de los argumentos: "inicio fin" o "inicio L longitud". Devuelve el desplazamiento final incluido y cuántos tokens usó. */
 function leadingRange(m: Machine, tokens: Token[], defaultSeg: number, missingCol: number): { start: Address; end: number; used: number } {
   if (!tokens[0]) throw new CommandError(missingCol);

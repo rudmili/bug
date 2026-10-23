@@ -62,6 +62,8 @@ export interface MemoryWindowView {
   captionValue: string;
   /** Pinta captionValue en ámbar (se usa cuando hubo una escritura en el último comando). */
   captionHot: boolean;
+  /** Se movió a mano: ya no sigue a CS:IP ni a las escrituras hasta que se pida seguir. */
+  pinned: boolean;
   /** Siempre 8 filas (128 bytes). En móvil la interfaz muestra solo las 4 primeras. */
   rows: MemoryRowView[];
 }
@@ -114,9 +116,25 @@ export interface DebugView {
   restarted: boolean;
 }
 
+export type MemoryWindowName = 'code' | 'data';
+
+/** A dónde mover una ventana de memoria. */
+export type MemoryTarget =
+  /** Avanza o retrocede esta cantidad de bytes (una página: 80h, o 40h en el móvil). */
+  | { by: number }
+  /** Va a la dirección tal como la escribió el usuario: "200", o "es:200" en la de datos. */
+  | { address: string }
+  /** Vuelve al modo automático. */
+  | { follow: true };
+
 /** Lo único que la interfaz necesita de la lógica. */
 export interface DebugSession {
   getView(): DebugView;
   /** Procesa una línea tal como la escribió el usuario (puede ser vacía) y devuelve el nuevo estado. */
   submit(line: string): DebugView;
+  /**
+   * Mueve una ventana de memoria sin ejecutar nada (no va a la terminal ni al registro guardado).
+   * null si la dirección no es válida; entonces la vista no cambia.
+   */
+  moveWindow(window: MemoryWindowName, to: MemoryTarget): DebugView | null;
 }

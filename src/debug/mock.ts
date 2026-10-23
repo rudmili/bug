@@ -73,6 +73,7 @@ function baseView(lines: TerminalLine[]): DebugView {
       caption: 'sigue a CS:IP',
       captionValue: '0100',
       captionHot: false,
+      pinned: false,
       rows: rows(0x100, (o) => byte(PROGRAM[o - 0x100] ?? 0, { isIp: o === 0x108 })),
     },
     data: {
@@ -80,6 +81,7 @@ function baseView(lines: TerminalLine[]): DebugView {
       caption: 'última escritura',
       captionValue: '[2000]',
       captionHot: false,
+      pinned: false,
       rows: rows(0x2000, () => byte(0)),
     },
     stack: {
@@ -115,5 +117,7 @@ export function createMockSession(): DebugSession {
       view = { ...view, lines: [...view.lines, { id: nextId++, kind: 'command', text: view.prompt + line }] };
       return view;
     },
+    // El diseño fijo no tiene más memoria que mostrar
+    moveWindow: () => view,
   };
 }

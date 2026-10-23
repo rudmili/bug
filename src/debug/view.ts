@@ -1,3 +1,4 @@
+import { addressFromText } from './commands';
 import { FLAG_CODES } from './flags';
 import { hex2, hex4, toSigned16 } from './hex';
 import { phys, readWord } from './memory';
@@ -8,6 +9,8 @@ import type {
   FlagKey,
   FlagView,
   MemoryRowView,
+  MemoryTarget,
+  MemoryWindowName,
   RegisterName,
   RegisterView,
   StackRowView,
@@ -21,9 +24,14 @@ import type {
 export interface ViewState {
   /** Desplazamiento de la primera fila de la ventana de código. */
   codeStart: number;
-  /** Desplazamiento en DS al que mira la ventana de datos. */
+  /** Desplazamiento al que mira la ventana de datos. */
   dataAnchor: number;
   dataHot: boolean;
+  /** Ventanas movidas a mano: no siguen a CS:IP ni a las escrituras. */
+  codePinned: boolean;
+  dataPinned: boolean;
+  /** Segmento de la ventana de datos si se eligió otro con "ir a" (es:200); null es DS. */
+  dataSeg: number | null;
   changedRegs: ReadonlySet<RegisterName>;
   changedFlags: ReadonlySet<FlagKey>;
   /** Direcciones físicas escritas por el último comando que modificó la máquina. */
@@ -35,6 +43,9 @@ export function createViewState(): ViewState {
     codeStart: 0x100,
     dataAnchor: 0x200,
     dataHot: false,
+    codePinned: false,
+    dataPinned: false,
+    dataSeg: null,
     changedRegs: new Set(),
     changedFlags: new Set(),
     hotBytes: new Set(),
@@ -128,27 +139,32 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
   const changedFlags = new Set(FLAG_ORDER.filter((k) => m.flags[k] !== prev.flags[k]));
   const modified = changedRegs.size > 0 || changedFlags.size > 0 || writes.length > 0;
 
-  // Ventana de datos: la última escritura de una instrucción (no de pila), o lo último que se vio con d o e
+  // Ventana de datos: la última escritura de una instrucción (no de pila), o lo último que se vio con d o e.
+  // Fijada a mano no sigue al programa, pero un d o un e la mueven y la vuelven a soltar
   const ds = m.sregs[DS];
   const lastData = writes.findLast((w) => w.kind === 'data');
-  let dataAnchor = state.dataAnchor;
+  let { dataAnchor, dataPinned, dataSeg } = state;
   let dataHot = modified ? false : state.dataHot;
-  if (lastData) {
-    dataAnchor = (lastData.addr - ds * 16) & 0xffff;
-    dataHot = true;
-  } else if (input.dataFocus !== undefined) {
+  if (input.dataFocus !== undefined) {
     dataAnchor = input.dataFocus;
     dataHot = false;
+    dataPinned = false;
+    dataSeg = null;
+  } else if (lastData && !dataPinned) {
+    dataAnchor = (lastData.addr - ds * 16) & 0xffff;
+    dataHot = true;
   }
 
-  // Ventana de código: se mueve solo cuando IP queda fuera
+  // Ventana de código: se mueve solo cuando IP queda fuera, y no si está fijada
   let codeStart = state.codeStart;
   const ip = m.ip;
-  if (((ip - codeStart) & 0xffff) >= ROWS * 16) codeStart = ip & 0xfff0;
+  if (!state.codePinned && ((ip - codeStart) & 0xffff) >= ROWS * 16) codeStart = ip & 0xfff0;
 
+  const windows = { codeStart, dataAnchor, dataHot, dataPinned, dataSeg };
   const next: ViewState = modified
-    ? { codeStart, dataAnchor, dataHot, changedRegs, changedFlags, hotBytes: new Set(writes.map((w) => w.addr)) }
-    : { ...state, codeStart, dataAnchor, dataHot };
+    ? { ...state, ...windows, changedRegs, changedFlags, hotBytes: new Set(writes.map((w) => w.addr)) }
+    : { ...state, ...windows };
+  const dataSegment = next.dataSeg ?? ds;
 
   const registers: RegisterView[] = REGISTER_NAMES.map((name) => ({
     name,
@@ -169,17 +185,20 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
     flags,
     code: {
       title: 'Memoria · código',
-      caption: 'sigue a CS:IP',
-      captionValue: hex4(ip),
+      caption: next.codePinned ? 'fija' : 'sigue a CS:IP',
+      captionValue: hex4(next.codePinned ? codeStart : ip),
       captionHot: false,
+      pinned: next.codePinned,
       rows: memoryRows(m, m.sregs[CS], codeStart, next.hotBytes),
     },
     data: {
       title: 'Memoria · datos',
-      caption: 'última escritura',
-      captionValue: `[${hex4(dataAnchor)}]`,
+      caption: next.dataPinned ? 'fija' : 'última escritura',
+      // En otro segmento se muestra completo: [1234:0200]
+      captionValue: `[${next.dataSeg === null ? '' : `${hex4(next.dataSeg)}:`}${hex4(dataAnchor)}]`,
       captionHot: dataHot,
-      rows: memoryRows(m, ds, dataAnchor & 0xfff0, next.hotBytes),
+      pinned: next.dataPinned,
+      rows: memoryRows(m, dataSegment, dataAnchor & 0xfff0, next.hotBytes),
     },
     stack: stackView(m),
     // Lo marca session cuando la línea fue `q`
@@ -188,3 +207,26 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
   return { view, state: next };
 }
 
+
+/**
+ * Mueve una ventana de memoria a pedido de la interfaz: una página, una dirección o de vuelta al
+ * modo automático. Movida a mano queda fija. null si la dirección no es válida.
+ * La ventana de código siempre mira CS; la de datos admite otro segmento ("es:200").
+ */
+export function moveWindow(m: Machine, state: ViewState, window: MemoryWindowName, to: MemoryTarget): ViewState | null {
+  if (window === 'code') {
+    if ('follow' in to) {
+      // Vuelve a mostrar CS:IP desde su fila, como al seguir la ejecución
+      return { ...state, codePinned: false, codeStart: m.ip & 0xfff0 };
+    }
+    if ('by' in to) return { ...state, codePinned: true, codeStart: (state.codeStart + to.by) & 0xfff0 };
+    const addr = addressFromText(m, to.address, CS);
+    if (!addr || addr.seg !== m.sregs[CS]) return null;
+    return { ...state, codePinned: true, codeStart: addr.off & 0xfff0 };
+  }
+  if ('follow' in to) return { ...state, dataPinned: false, dataSeg: null };
+  if ('by' in to) return { ...state, dataPinned: true, dataAnchor: ((state.dataAnchor & 0xfff0) + to.by) & 0xffff };
+  const addr = addressFromText(m, to.address, DS);
+  if (!addr) return null;
+  return { ...state, dataPinned: true, dataAnchor: addr.off, dataSeg: addr.seg === m.sregs[DS] ? null : addr.seg };
+}
