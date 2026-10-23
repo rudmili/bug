@@ -11,11 +11,13 @@ interface TerminalProps {
   onSubmit: (line: string) => void;
   /** Líneas ya escritas que recorren las flechas ↑ ↓ (vienen del registro persistido). */
   history: string[];
+  /** Hay un comando corriendo: como en DEBUG, no se escribe ni se envía hasta que termina. La línea queda en solo lectura, que a diferencia de disabled conserva el foco. */
+  busy: boolean;
   /** Contenido que flota sobre la salida (la versión y el enlace al repositorio). */
   children?: ReactNode;
 }
 
-export function Terminal({ lines, prompt, onSubmit, history, children }: TerminalProps) {
+export function Terminal({ lines, prompt, onSubmit, history, busy, children }: TerminalProps) {
   const [value, setValue] = useState('');
   const [cursor, setCursor] = useState<number | null>(null);
   const outRef = useRef<HTMLDivElement>(null);
@@ -29,6 +31,7 @@ export function Terminal({ lines, prompt, onSubmit, history, children }: Termina
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     onSubmit(value);
     setCursor(null);
     setValue('');
@@ -56,7 +59,7 @@ export function Terminal({ lines, prompt, onSubmit, history, children }: Termina
   }
 
   return (
-    <main className="term" onClick={focusInput}>
+    <main className="term" onClick={focusInput} aria-busy={busy}>
       {children}
       {/* tabIndex: la salida se puede desplazar con el teclado */}
       <div className="term__out" ref={outRef} role="region" aria-label="Salida de DEBUG" tabIndex={0}>
@@ -89,8 +92,13 @@ export function Terminal({ lines, prompt, onSubmit, history, children }: Termina
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
+          readOnly={busy}
           autoFocus
         />
+        {/* Solo aparece si el comando tarda (ver .term__busy): los rápidos no parpadean */}
+        <span className="term__busy" aria-hidden="true">
+          Ejecutando…
+        </span>
       </form>
     </main>
   );

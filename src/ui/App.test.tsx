@@ -3,7 +3,10 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDebugSession } from '../debug/session';
+import type { DebugView } from '../debug/types';
 import { App } from './App';
+import { createLocalClient } from './client';
+import type { SessionClient } from './client';
 import { useCommandLog } from './store';
 
 // jsdom no implementa los diálogos modales: lo justo para <dialog> con <form method="dialog"> y Escape
@@ -27,9 +30,11 @@ beforeAll(() => {
   });
 });
 
-function setup() {
+/** Monta la aplicación y espera a que la sesión arranque (vuelve a ejecutar lo guardado). */
+async function setup(client: SessionClient = createLocalClient(createDebugSession)) {
   const user = userEvent.setup();
-  const utils = render(<App createSession={createDebugSession} />);
+  const utils = render(<App client={client} />);
+  await screen.findByLabelText('Comando de DEBUG');
   const input = () => screen.getByLabelText<HTMLInputElement>('Comando de DEBUG');
   const output = () => screen.getByLabelText('Salida de DEBUG');
   /** Escribe cada línea en la terminal y pulsa Enter. */
@@ -51,13 +56,13 @@ afterEach(() => {
 });
 
 describe('App', () => {
-  it('con la terminal vacía muestra la guía de comandos', () => {
-    const { output } = setup();
+  it('con la terminal vacía muestra la guía de comandos', async () => {
+    const { output } = await setup();
     expect(within(output()).getByText('DEBUG 8086')).toBeTruthy();
   });
 
   it('ejecuta un comando y muestra la salida', async () => {
-    const { output, type } = setup();
+    const { output, type } = await setup();
     await type('r');
     expect(within(output()).getByText('-r')).toBeTruthy();
     // Sin normalizar: los dos espacios entre registros son parte del formato de DEBUG
@@ -65,7 +70,7 @@ describe('App', () => {
   });
 
   it('el modo ensamblado cambia el prompt y una línea vacía sale', async () => {
-    const { type } = setup();
+    const { type } = await setup();
     await type('a');
     expect(screen.getByText('073F:0100')).toBeTruthy();
     await type('mov ax,1234', '');
@@ -73,7 +78,7 @@ describe('App', () => {
   });
 
   it('las flechas recorren lo escrito sin las líneas vacías', async () => {
-    const { user, input, type } = setup();
+    const { user, input, type } = await setup();
     await type('a', 'nop', '', 'd 100');
     await user.keyboard('{ArrowUp}');
     expect(input().value).toBe('d 100');
@@ -86,17 +91,17 @@ describe('App', () => {
   });
 
   it('al recargar la página vuelve al mismo estado', async () => {
-    const first = setup();
+    const first = await setup();
     await first.type('r ax', '1234', 'r');
     first.unmount();
 
-    const second = setup();
+    const second = await setup();
     expect(second.register('AX')).toBe('1234');
     expect(within(second.output()).getAllByText('-r')).toHaveLength(1);
   });
 
   it('q olvida lo guardado para reconstruir la máquina pero no el historial', async () => {
-    const { user, input, type } = setup();
+    const { user, input, type } = await setup();
     await type('r ax', '1234', 'q');
     expect(useCommandLog.getState().log).toEqual([]);
     await user.keyboard('{ArrowUp}');
@@ -104,7 +109,7 @@ describe('App', () => {
   });
 
   it('Reiniciar pide confirmación en un diálogo y deja la máquina como al abrir', async () => {
-    const { user, output, type, register } = setup();
+    const { user, output, type, register } = await setup();
     const reset = screen.getByRole('button', { name: /Reiniciar/ });
     expect(reset).toHaveProperty('disabled', true);
     await type('r ax', '1234');
@@ -122,7 +127,7 @@ describe('App', () => {
   });
 
   it('Escape cierra el diálogo sin reiniciar', async () => {
-    const { user, type, register } = setup();
+    const { user, type, register } = await setup();
     await type('r ax', '1234');
     await user.click(screen.getByRole('button', { name: /Reiniciar/ }));
     await user.keyboard('{Escape}');
@@ -131,7 +136,7 @@ describe('App', () => {
   });
 
   it('las pestañas siguen el patrón de WAI-ARIA', async () => {
-    const { user } = setup();
+    const { user } = await setup();
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((t) => t.textContent)).toEqual(['Registros', 'Memoria', 'Pila']);
     expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
@@ -154,7 +159,7 @@ describe('App', () => {
   });
 
   it('Escape oculta el popup del registro con foco hasta que el foco se va', async () => {
-    const { user } = setup();
+    const { user } = await setup();
     const ax = screen.getByText('AX', { selector: '.reg__name' }).parentElement!;
     ax.focus();
     await user.keyboard('{Escape}');
@@ -163,8 +168,32 @@ describe('App', () => {
     expect(ax.dataset.tipHidden).toBeUndefined();
   });
 
+  it('mientras un comando corre, la línea queda en solo lectura y conserva el foco', async () => {
+    const local = createLocalClient(createDebugSession);
+    let finish: (() => void) | undefined;
+    const slow: SessionClient = {
+      ...local,
+      submit: (line) =>
+        new Promise<DebugView>((resolve) => {
+          finish = () => void local.submit(line).then(resolve);
+        }),
+    };
+    const { user, input, output } = await setup(slow);
+    await user.type(input(), 'r{Enter}');
+    expect(input().readOnly).toBe(true);
+    expect(document.activeElement).toBe(input());
+    // Como en DEBUG durante un `g`: no se escribe ni se envía nada hasta que termina
+    await user.type(input(), 'u{Enter}');
+    expect(input().value).toBe('');
+    expect(useCommandLog.getState().log).toEqual(['r']);
+
+    finish!();
+    await within(output()).findByText('-r');
+    expect(input().readOnly).toBe(false);
+  });
+
   it('el lector de pantalla oye la respuesta del último comando', async () => {
-    const { type } = setup();
+    const { type } = await setup();
     await type('r ax');
     expect(document.querySelector('[aria-live]')?.textContent).toBe('AX 0000');
   });

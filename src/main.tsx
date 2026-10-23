@@ -9,7 +9,7 @@ import '@fontsource/ibm-plex-sans/latin-600.css'
 import { createRoot } from 'react-dom/client'
 import { App } from './ui/App'
 import { ErrorBoundary } from './ui/ErrorBoundary'
-import { createDebugSession } from './debug/session'
+import { createWorkerClient } from './ui/client'
 
 // Modo sin conexión: sw.js solo existe en el build (vite.config.ts)
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
@@ -20,11 +20,13 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   })
 }
 
-// App crea la sesión y le vuelve a ejecutar los comandos guardados; al reiniciar crea otra
+// La sesión corre en un worker, creado una sola vez fuera de React (StrictMode monta App dos veces)
+const client = createWorkerClient()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App createSession={createDebugSession} />
+      <App client={client} />
     </ErrorBoundary>
   </StrictMode>,
 )
