@@ -1,7 +1,10 @@
+# CSP: solo recursos propios. El hash es el del <style> de 404.html: si se cambia ese estilo, hay que
+# recalcularlo. data: en fuentes e imágenes porque Vite incrusta los archivos de menos de 4 kB.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'sha256-DydP8qa/cr+LEZ08qHMC5x1U0/AfrkkbBwO3rET+KZw='; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
