@@ -13,6 +13,8 @@ Junto a la terminal, un panel muestra el estado de la máquina después de cada 
 - **Registros y banderas**, con lo que cambió en el último comando resaltado en ámbar.
 - **Memoria de código**, que sigue a `CS:IP` y marca la instrucción que se ejecuta a continuación.
 - **Memoria de datos**, que salta a la última dirección escrita por el programa.
+
+Las dos ventanas de memoria se recorren por páginas con ◀ ▶ (o RePág y AvPág), o se llevan a una dirección escribiéndola en "ir a…" (la de datos acepta otro segmento, como `es:200`). Movida a mano, una ventana queda fija hasta pulsar **Seguir**; un `d` o un `e` también mueven la de datos.
 - **Pila**, con la posición de `SP`, las palabras apiladas y las posiciones libres.
 
 En el móvil el panel se divide en pestañas; en tableta se muestra como una franja sobre la terminal. Con pantalla táctil aparecen botones para `t`, `p`, `g` y `r`, para avanzar sin abrir el teclado.
