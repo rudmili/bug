@@ -177,6 +177,17 @@ Analiza una línea y la ejecuta contra la máquina. Devuelve las líneas a impri
 | `g [=dirección]` | Ejecuta hasta que el programa termina. |
 | `q` | Vuelve todo al estado inicial y limpia la terminal. |
 
+Agregados después, con el formato del DEBUG de MS-DOS:
+
+| Comando | Comportamiento |
+|---|---|
+| `p [=dirección] [cantidad]` | Como `t`, pero un CALL o un LOOP/LOOPZ/LOOPNZ se ejecuta hasta que CS:IP llega a la instrucción siguiente. |
+| `h <valor> <valor>` | Imprime la suma y la resta en 16 bits: `0008  0002`. |
+| `f <rango> <lista>` | Llena el rango repitiendo la lista. El rango es obligatorio (`inicio fin` o `inicio L longitud`). |
+| `m <rango> <dirección>` | Copia el rango; funciona aunque origen y destino se superpongan. |
+| `c <rango> <dirección>` | Una línea por cada byte distinto: `073F:0201  4F  45  073F:0301`. |
+| `s <rango> <lista>` | La dirección de cada aparición de la lista que entra entera en el rango. |
+
 Rangos: `inicio fin` o `inicio L longitud`. Una dirección puede llevar segmento (`cs:100`). Se admite el comando pegado a su argumento (`e1100`, `u100`).
 
 **Formato exacto de las salidas**
@@ -305,5 +316,5 @@ Otros:
 2. `t` sobre una instrucción INT resuelve la interrupción entera en un paso.
 3. `g` se detiene tras 1.000.000 de instrucciones con un aviso, para no congelar la pestaña.
 4. Ejecutar un opcode no definido detiene la ejecución con un aviso.
-5. No hay comandos de archivos ni de disco (`n`, `l`, `w`). Quedan para después `f`, `m`, `c`, `s`, `h` y `p`.
-6. La memoria fuera de las dos excepciones iniciales empieza en cero, así que la "basura" después del programa no coincide con la de un equipo real.
+5. No hay comandos de archivos, de disco ni de puertos (`n`, `l`, `w`, `i`, `o`).
+6. La memoria fuera del PSP y de los restos copiados de DOSBox empieza en cero, así que la "basura" después del programa puede no coincidir con la de otro equipo.

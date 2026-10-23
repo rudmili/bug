@@ -25,10 +25,18 @@ En el móvil el panel se divide en pestañas; en tableta se muestra como una fra
 | `u [rango]` | Desensambla la memoria. |
 | `r [registro]` | Muestra los registros, o cambia el valor de uno. |
 | `t [=dirección] [cantidad]` | Ejecuta una instrucción (o varias) y muestra los registros. |
-| `g [=dirección]` | Ejecuta hasta que el programa termina. |
+| `p [=dirección] [cantidad]` | Como `t`, pero un `CALL` o un `LOOP` se ejecutan enteros. |
+| `g [=dirección] [paradas]` | Ejecuta hasta que el programa termina o llega a un punto de parada. |
 | `d [rango]` | Muestra la memoria en hexadecimal y ASCII. |
 | `e dirección [lista]` | Escribe bytes o cadenas en memoria. |
+| `f rango lista` | Llena el rango repitiendo la lista. |
+| `m rango dirección` | Copia el rango a otra dirección. |
+| `c rango dirección` | Compara el rango con otra dirección y muestra las diferencias. |
+| `s rango lista` | Busca la lista en el rango. |
+| `h valor valor` | Muestra la suma y la resta de los dos valores. |
 | `q` | Reinicia la máquina y limpia la terminal. |
+| `man [comando]` | Explica un comando, con ejemplos (no es de DEBUG). |
+| `clear` | Limpia la terminal sin tocar la máquina (no es de DEBUG). |
 
 Todos los números son hexadecimales. Un rango es `inicio fin` o `inicio L longitud`, y una dirección puede llevar segmento (`cs:100`).
 
@@ -66,7 +74,7 @@ Diferencias con el DEBUG real:
 - `q` reinicia la sesión en lugar de cerrar el programa.
 - `t` sobre un `INT` resuelve la interrupción completa en un solo paso.
 - `g` se detiene tras 1.000.000 de instrucciones, para no congelar la pestaña.
-- No hay comandos de archivos ni de disco (`n`, `l`, `w`), ni `f`, `m`, `c`, `s`, `h` o `p`.
+- No hay comandos de archivos, de disco ni de puertos (`n`, `l`, `w`, `i`, `o`).
 - La máquina arranca con los valores de una sesión concreta de DOSBox: segmento `073F`, `SP=00FD` y el PSP que deja DOS. El resto de la memoria arranca en cero, así que lo que haya más allá del programa puede no coincidir con el de otro equipo.
 
 ## Desarrollo
