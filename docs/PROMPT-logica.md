@@ -98,20 +98,48 @@ Puntos que suelen fallar:
 
 ## 7. Módulo `dos`: interrupciones simuladas
 
-DOS no es parte del procesador, así que se simula lo mínimo. `INT n` se resuelve completo dentro de un solo paso (no se entra a código de DOS).
+Agregado después de la primera versión: las interrupciones funcionan como en el 8086. `INT n` apila FLAGS, CS e IP, apaga IF y TF y salta al vector de `0000:n*4`; `IRET` vuelve. La tabla de vectores es la de DOSBox (`d 0:0 l 400`, copiada en `memory.ts`).
 
-| Interrupción | Comportamiento |
+Como en DOSBox, DOS y el BIOS no tienen código propio: sus vectores apuntan a manejadores en `F000` (el del servicio n está en `F000:1000 + n*20h`) que piden el servicio con la instrucción `FE 38 nnnn` y vuelven con `IRET`. `dos` resuelve cada servicio de una vez. Los vectores de DEBUG (22h a 24h) apuntan a servicios del simulador.
+
+| Servicio | Comportamiento |
 |---|---|
 | INT 20 | Termina el programa |
-| INT 21, AH=02 | Escribe el carácter de DL en la salida |
-| INT 21, AH=09 | Escribe la cadena que empieza en DS:DX hasta el carácter `$`, sin incluirlo |
-| INT 21, AH=4C | Termina el programa |
+| INT 21, AH=00 o 4C | Termina el programa |
+| INT 21, AH=02 | Escribe el carácter de DL en la salida y lo deja en AL (un tab deja 20, como en DOSBox) |
+| INT 21, AH=09 | Escribe la cadena que empieza en DS:DX hasta el carácter `$`, sin incluirlo; AL queda en 24 (el `$`) |
+| INT 21, AH=25 | Instala DS:DX como manejador de la interrupción AL |
+| INT 21, AH=35 | Devuelve en ES:BX el manejador de la interrupción AL |
+| INT 21, AH=01 / 07 / 08 | Espera una tecla y la deja en AL. 01 la muestra; 01 y 08 terminan con `^C` ante Ctrl+C. Una tecla extendida llega en dos lecturas: 00 y su código |
+| INT 21, AH=06 | DL=FF: lee sin esperar (ZF=1 si no hay tecla); otro DL: escribe ese carácter y lo deja en AL |
+| INT 21, AH=0A | Lee una línea en DS:DX ([DX] máximo, [DX+1] cantidad, los caracteres y 0D), de a una tecla con eco: Backspace borra, Enter termina (eco de 0D) y lo que no entra se ignora |
+| INT 21, AH=0B | AL=FF si hay una tecla esperando, 00 si no |
+| INT 21, AH=0C | Vacía el teclado y llama a la función de AL (01, 06, 07, 08 o 0A); con otro AL solo vacía y deja AL=00 |
+| INT 10, AH=0E | Escribe el carácter de AL como una teletipo; las demás funciones de video no hacen nada |
+| INT 21, AH=2A | Fecha: CX año, DH mes, DL día, AL día de la semana (0 = domingo) |
+| INT 21, AH=2B | Cambia la fecha a CX/DH/DL si es válida (1980 a 2099): AL=00; si no, AL=FF |
+| INT 21, AH=2C | Hora: CH horas, CL minutos, DH segundos, DL centésimas (salen de los ticks, de a ~5,5) |
+| INT 21, AH=2D | Cambia la hora a CH/CL/DH/DL si es válida: AL=00; si no, AL=FF |
+| INT 1A, AH=00 | CX:DX ticks desde medianoche; AL = medianoches pasadas desde la última lectura (se borra) |
+| INT 1A, AH=01 | Pone CX:DX como ticks |
+| INT 1A, AH=02 / 04 | Hora (CH, CL, DH) y fecha (CH siglo, CL año, DH, DL) del reloj de tiempo real, en BCD, con CF=0 |
+| INT 16, AH=00/10 | Espera una tecla: AH = código de tecla, AL = ASCII |
+| INT 16, AH=01/11 | Mira la próxima tecla sin sacarla: ZF=1 si no hay |
+| INT 16, AH=02/12 | Teclas de cambio: ninguna apretada |
+| INT 16, AH=05 | Mete CX en el buffer del teclado |
 | INT 21, otras funciones | Se ignoran |
-| INT 0 (división) | Imprime `Divide overflow` y termina el programa |
-| INT 3 | Detiene `g` y muestra los registros |
-| Otras | Se ignoran |
+| INT 23 (Ctrl+C) | Imprime `^C` y termina, sin `Program terminated normally` |
+| Otros servicios | Vuelven sin hacer nada |
 
-La salida de texto va a la terminal: 0D se descarta y 0A corta la línea. Al terminar el programa se imprime `Program terminated normally` y los registros quedan como estaban.
+Cuando un servicio espera una tecla que no hay, CS:IP vuelve a la instrucción `FE 38` del manejador y el `g`, `t` o `p` queda en pausa (modo `input`, prompt vacío) con la línea que el programa dejó a medias. Cada línea que llega en ese modo es una tecla: un carácter, '' para Enter o el nombre de una tecla sin carácter entre llaves (`{Up}`, `{F1}`); se guarda en el registro como cualquier línea, así que la repetición reproduce la misma ejecución. Tras 100 consultas seguidas sin tecla (AH=0B, AH=06 con DL=FF, INT 16 AH=01) también se pausa.
+
+El reloj (`clock.ts`) sigue a DOSBox: al arrancar, la fecha de DOS es la de la PC y 0040:006C tiene los ticks desde medianoche (ms × 1193182 / 65536 / 1000). Cada instrucción ejecutada suma 1193182 pulsos y cada 65536 × 3.000.000 se completa un tick (3000 instrucciones por milisegundo, `cycles=3000`); con IF=0 el tick queda pendiente hasta que IF vuelva a 1. A medianoche el contador vuelve a 0 y sube la marca de 0040:0070; DOS avanza su fecha al verla en AH=2A o AH=2C. La hora de arranque viaja en `DebugView.clock` ("2026-10-22T23:18:45.32"): la interfaz la guarda con el registro, el enlace y el `.txt`, y `createDebugSession(clock)` arranca desde ella, así que la repetición da la misma hora. Tras `q` la máquina nueva arranca a la hora que marcaba el reloj.
+
+La salida sigue la consola de DOS: 0D vuelve al principio de la línea, 0A baja sin cambiar de columna, 08 retrocede una columna, 09 avanza hasta la siguiente columna múltiplo de 8 y 07 no se ve.
+
+Las atiende DEBUG, sin pasar por la tabla: INT 3 detiene `g` y muestra los registros; INT 0 (división), mientras el vector 0 sea el de arranque, imprime `Divide overflow` y termina.
+
+La salida de texto va a la terminal con las reglas de la consola de arriba. Al terminar el programa se imprime `Program terminated normally` y los registros quedan como estaban.
 
 ## 8. Módulo `assembler`
 
@@ -313,7 +341,7 @@ Otros:
 ## 12. Desviaciones permitidas respecto de DEBUG real
 
 1. `q` reinicia la sesión en vez de cerrar el programa.
-2. `t` sobre una instrucción INT resuelve la interrupción entera en un paso.
+2. `t` sobre un INT de DOS o del BIOS (su vector es el de arranque) lo resuelve entero en un paso; si apunta a un manejador propio, entra.
 3. `g` se detiene tras 1.000.000 de instrucciones con un aviso, para no congelar la pestaña.
 4. Ejecutar un opcode no definido detiene la ejecución con un aviso.
 5. No hay comandos de archivos, de disco ni de puertos (`n`, `l`, `w`, `i`, `o`).
