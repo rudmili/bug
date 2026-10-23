@@ -86,7 +86,7 @@ export function Terminal({ lines, prompt, onSubmit, history, busy, children }: T
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="a, u, r, t, d, e, g, q"
+          placeholder="a, u, t, p, g, r, d, e, q"
           aria-label="Comando de DEBUG"
           autoComplete="off"
           autoCapitalize="off"
