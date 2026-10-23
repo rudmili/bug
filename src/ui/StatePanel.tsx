@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, RefObject } from 'react';
-import type { DebugView } from '../debug/types';
+import type { DebugView, MemoryTarget, MemoryWindowName } from '../debug/types';
 import { Registers } from './Registers';
 import { Flags } from './Flags';
 import { MemoryWindow } from './MemoryWindow';
@@ -60,7 +60,13 @@ function useDismissableTips(panel: RefObject<HTMLElement | null>) {
  *  - md: franja de dos columnas, todo visible
  *  - lg en adelante: columna flotante sobre la terminal
  */
-export function StatePanel({ view }: { view: PanelView }) {
+interface StatePanelProps {
+  view: PanelView;
+  /** Mueve una ventana de memoria; resuelve false si la dirección no es válida. */
+  onMoveWindow: (window: MemoryWindowName, to: MemoryTarget) => Promise<boolean>;
+}
+
+export function StatePanel({ view, onMoveWindow }: StatePanelProps) {
   const [tab, setTab] = useState<Tab>('reg');
   const panelRef = useRef<HTMLElement>(null);
   const tabRefs = useRef(new Map<Tab, HTMLButtonElement>());
@@ -112,8 +118,8 @@ export function StatePanel({ view }: { view: PanelView }) {
         <StackView stack={view.stack} />
       </div>
       <div className="panel__col panel__col--b">
-        <MemoryWindow id="sec-code" window={view.code} />
-        <MemoryWindow id="sec-data" window={view.data} />
+        <MemoryWindow id="sec-code" window={view.code} onMove={(to) => onMoveWindow('code', to)} />
+        <MemoryWindow id="sec-data" window={view.data} onMove={(to) => onMoveWindow('data', to)} />
       </div>
     </aside>
   );

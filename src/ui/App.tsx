@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './tokens.css';
 import './debug-ui.css';
-import type { DebugView } from '../debug/types';
+import type { DebugView, MemoryTarget, MemoryWindowName } from '../debug/types';
 import type { SessionClient } from './client';
 import { ConfirmDialog } from './ConfirmDialog';
 import { Terminal } from './Terminal';
@@ -99,6 +99,18 @@ export function App({ client, shared = null }: AppProps) {
     });
   }
 
+  // Navegar la memoria no ejecuta nada: no bloquea la línea ni va al registro guardado
+  async function moveWindow(window: MemoryWindowName, to: MemoryTarget): Promise<boolean> {
+    try {
+      const next = await client.moveWindow(window, to);
+      if (next) setView(next);
+      return next !== null;
+    } catch (error) {
+      setFailure(error);
+      return false;
+    }
+  }
+
   function load(lines: string[]) {
     useCommandLog.getState().load(lines);
     return run(() => client.start(lines));
@@ -160,7 +172,7 @@ export function App({ client, shared = null }: AppProps) {
     <div className="app">
       {/* Título de la página para lectores de pantalla y buscadores; la terminal ya lo deja claro a la vista */}
       <h1 className="sr-only">Simulador DEBUG 8086</h1>
-      <StatePanel view={view} />
+      <StatePanel view={view} onMoveWindow={moveWindow} />
       <Terminal lines={view.lines} prompt={view.prompt} history={history} busy={busy} onSubmit={submit}>
         <AppInfo className="info--float" />
         <Tools

@@ -1,6 +1,6 @@
 import { createSessionHost } from '../debug/host';
 import type { SessionRequest, SessionResponse } from '../debug/host';
-import type { DebugSession, DebugView } from '../debug/types';
+import type { DebugSession, DebugView, MemoryTarget, MemoryWindowName } from '../debug/types';
 
 /** Lo que la interfaz le pide a la sesión. Asíncrono: la sesión puede correr en otro hilo. */
 export interface SessionClient {
@@ -8,6 +8,8 @@ export interface SessionClient {
   start(lines: string[]): Promise<DebugView>;
   submit(line: string): Promise<DebugView>;
   reset(): Promise<DebugView>;
+  /** Mueve una ventana de memoria; null si la dirección no es válida. */
+  moveWindow(window: MemoryWindowName, to: MemoryTarget): Promise<DebugView | null>;
 }
 
 /** Omit que se reparte sobre cada variante de la unión (Omit sobre la unión entera perdería los campos propios). */
@@ -30,6 +32,7 @@ function clientFor(send: (request: SessionRequest) => void) {
     start: (lines) => view({ type: 'start', lines }),
     submit: (line) => view({ type: 'submit', line }),
     reset: () => view({ type: 'reset' }),
+    moveWindow: (window, to) => call({ type: 'window', window, to }),
   };
   return {
     client,

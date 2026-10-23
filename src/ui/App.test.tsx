@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDebugSession } from '../debug/session';
@@ -211,7 +211,7 @@ describe('App: compartir, guardar y abrir', () => {
     await user.click(share);
     const url = new URL(await navigator.clipboard.readText());
     expect(sharedLines(url.hash)).toEqual(['r bx', '5']);
-    expect(screen.getByRole('status').textContent).toBe('Enlace copiado');
+    expect(screen.getByText('Enlace copiado').getAttribute('role')).toBe('status');
   });
 
   it('Guardar descarga las líneas como texto', async () => {
@@ -271,5 +271,50 @@ describe('App: comandos rápidos', () => {
 
     await type('a');
     expect(quick.getByRole('button', { name: 't' })).toHaveProperty('disabled', true);
+  });
+});
+
+describe('App: navegar la memoria', () => {
+  const memoryWindow = (name: string) => within(screen.getByRole('region', { name }));
+  const firstRow = (name: string) =>
+    screen.getByRole('region', { name }).querySelector('.mem__addr')?.textContent;
+
+  it('las flechas cambian de página y Seguir vuelve a CS:IP', async () => {
+    const { user } = await setup();
+    const code = memoryWindow('Memoria · código');
+    expect(code.queryByRole('button', { name: 'Seguir' })).toBeNull();
+
+    await user.click(code.getByRole('button', { name: /Página siguiente/ }));
+    await waitFor(() => expect(firstRow('Memoria · código')).toBe('0180'));
+    await user.click(code.getByRole('button', { name: /Página anterior/ }));
+    await user.click(code.getByRole('button', { name: /Página anterior/ }));
+    await waitFor(() => expect(firstRow('Memoria · código')).toBe('0080'));
+
+    await user.click(code.getByRole('button', { name: 'Seguir' }));
+    await waitFor(() => expect(firstRow('Memoria · código')).toBe('0100'));
+    expect(code.queryByRole('button', { name: 'Seguir' })).toBeNull();
+  });
+
+  it('RePág y AvPág cambian de página con el foco en la ventana', async () => {
+    const { user } = await setup();
+    memoryWindow('Memoria · datos').getByRole('button', { name: /Página siguiente/ }).focus();
+    await user.keyboard('{PageDown}');
+    await waitFor(() => expect(firstRow('Memoria · datos')).toBe('0280'));
+    await user.keyboard('{PageUp}{PageUp}');
+    await waitFor(() => expect(firstRow('Memoria · datos')).toBe('0180'));
+  });
+
+  it('ir a una dirección; una inválida se marca y no mueve la ventana', async () => {
+    const { user } = await setup();
+    const input = memoryWindow('Memoria · datos').getByRole('textbox', { name: /Ir a una dirección/ });
+    await user.type(input, 'zz{Enter}');
+    await waitFor(() => expect(input.getAttribute('aria-invalid')).toBe('true'));
+    expect(firstRow('Memoria · datos')).toBe('0200');
+
+    await user.clear(input);
+    await user.type(input, 'ds:1234{Enter}');
+    await waitFor(() => expect(firstRow('Memoria · datos')).toBe('1230'));
+    expect(input).toHaveProperty('value', '');
+    expect(input.getAttribute('aria-invalid')).toBe('false');
   });
 });
