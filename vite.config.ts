@@ -35,6 +35,20 @@ export default defineConfig({
       name: 'app-version',
       transformIndexHtml: () => [{ tag: 'meta', attrs: { name: 'version', content: appVersion }, injectTo: 'head' }],
     },
+    {
+      // sw.js con la versión y la lista de archivos del build (ver src/service-worker.js)
+      name: 'service-worker',
+      apply: 'build',
+      generateBundle(_, bundle) {
+        // Los .woff son el respaldo de navegadores sin woff2: nadie que use el service worker los pide
+        const files = Object.keys(bundle).filter((file) => file !== 'index.html' && !file.endsWith('.woff'))
+        const precache = ['/', '/favicon.svg', '/manifest.webmanifest', ...files.map((file) => `/${file}`)]
+        const source = readFileSync(new URL('./src/service-worker.js', import.meta.url), 'utf8')
+          .replace('__VERSION__', appVersion)
+          .replace('__PRECACHE__', JSON.stringify(precache))
+        this.emitFile({ type: 'asset', fileName: 'sw.js', source })
+      },
+    },
   ],
   test: {
     // La lógica corre en Node; los tests de la interfaz piden jsdom con un comentario al principio del archivo
