@@ -15,7 +15,15 @@ Junto a la terminal, un panel muestra el estado de la máquina después de cada 
 - **Memoria de datos**, que salta a la última dirección escrita por el programa.
 - **Pila**, con la posición de `SP`, las palabras apiladas y las posiciones libres.
 
-En el móvil el panel se divide en pestañas; en tableta se muestra como una franja sobre la terminal.
+En el móvil el panel se divide en pestañas; en tableta se muestra como una franja sobre la terminal. Con pantalla táctil aparecen botones para `t`, `p`, `g` y `r`, para avanzar sin abrir el teclado.
+
+Lo escrito se guarda en el navegador y sobrevive a una recarga. Sobre la terminal hay cuatro botones:
+
+- **Compartir** copia un enlace que abre el simulador con el mismo programa (va en el `#` de la dirección, así que no pasa por ningún servidor).
+- **Guardar** descarga la sesión como `.txt`, una línea por comando, y **Abrir** carga uno.
+- **Reiniciar** deja la máquina como al abrir la página.
+
+Después de la primera visita funciona sin conexión y se puede instalar como aplicación.
 
 ## Comandos
 
@@ -84,19 +92,23 @@ Requiere Node 24 y pnpm.
 ```bash
 pnpm install
 pnpm dev      # servidor de desarrollo
-pnpm test     # tests (Vitest)
+pnpm test     # tests en modo watch (Vitest)
+pnpm test:run # tests una sola vez
+pnpm coverage # tests con informe de cobertura en coverage/
 pnpm build    # compilación de producción en dist/
 pnpm lint
 ```
 
-Hecho con React 19, TypeScript, Vite y el React Compiler. La lógica del simulador no depende de React y se puede usar sola desde Node.
+Hecho con React 19, TypeScript, Vite y el React Compiler. La lógica del simulador no depende de React y se puede usar sola desde Node; en el navegador corre en un Web Worker, así que un programa largo no congela la página.
 
 ```
 src/
   debug/   lógica del simulador, un módulo por archivo con sus tests
            hex → state → memory → flags → decoder → disassembler
            → executor → dos → assembler → commands → view → session
-  ui/      componentes de la interfaz y estilos
+           host y worker la sirven desde otro hilo
+  ui/      componentes de la interfaz, estilos y sus tests (jsdom)
+  service-worker.js   plantilla del modo sin conexión (vite.config.ts la completa)
 docs/      especificación original y diseño de referencia
 ```
 
