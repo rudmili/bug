@@ -86,6 +86,11 @@ body {
 /* El historial se apoya abajo, como en una terminal real */
 .term__out > :first-child { margin-top: auto; }
 
+/* Las líneas fuera de la vista no se dibujan: con 2000 en la terminal, el scroll y cada comando cuestan menos.
+   Cada línea mide exactamente una línea de texto (white-space: pre), así que la altura reservada es exacta */
+@supports (contain-intrinsic-block-size: 1lh) {
+  .term__line { content-visibility: auto; contain-intrinsic-block-size: auto 1lh; }
+}
 .term__line--command { color: var(--cmd); }
 .term__line--error { color: var(--text); }
 
