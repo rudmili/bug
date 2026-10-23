@@ -47,6 +47,7 @@ describe('disassembler', () => {
     [[0x26], 'ES:'],
     [[0xf3], 'REPZ'],
     [[0x0f], 'DB      0F'],
+    [[0xfe, 0x38], '???     [BX+SI]'],
   ])('%j → %s', (bytes, expected) => {
     expect(text(bytes)).toBe(expected);
   });

@@ -2,19 +2,21 @@ import { assemble } from './assembler';
 import { SREG_NAMES, decode } from './decoder';
 import type { Instr } from './decoder';
 import { formatLine } from './disassembler';
-import { Output, handleInterrupt } from './dos';
-import { effectiveOffset, step } from './executor';
+import { Output, divideOverflow, runService } from './dos';
+import { effectiveOffset, raiseInterrupt, returnFromInterrupt, step } from './executor';
 import { flagsText } from './flags';
 import { hex2, hex4, parseHex } from './hex';
+import { keyFromLine } from './keyboard';
 import { manual } from './manual';
-import { readByte, readWord, writeByte } from './memory';
+import { isBootVector, readByte, readWord, writeByte } from './memory';
 import { CS, DS, REG16, SREG, isRegisterName, readRegister, writeRegister } from './state';
 import type { Machine } from './state';
 import type { RegisterName } from './types';
 
 /** Los comandos de DEBUG: analizan una línea, la ejecutan contra la máquina y devuelven qué imprimir. */
 
-export type Mode = 'command' | 'assemble' | 'register' | 'edit';
+/** `input`: un programa espera una tecla; cada línea que llega es una tecla para él. */
+export type Mode = 'command' | 'assemble' | 'register' | 'edit' | 'input';
 
 export interface Address {
   seg: number;
@@ -34,7 +36,17 @@ export interface CommandState {
   editAddr: Address;
   /** Registro que se edita con `r <registro>`. */
   editReg: RegisterName | null;
+  /** `g`, `t` o `p` en pausa porque el programa espera una tecla; null si no hay. */
+  job: Job | null;
+  /** La consola del programa mientras está en pausa: lo que lleva escrito en la línea a medias. */
+  console: Output | null;
 }
+
+/** Un `g`, `t` o `p` en curso: lo que hace falta para seguirlo cuando llegue la tecla que espera el programa. */
+type Job =
+  | { kind: 'go'; breakpoints: Set<number>; steps: number }
+  /** target: fin del paso en curso cuando es una llamada o un INT que se ejecuta entero. */
+  | { kind: 'trace'; proceed: boolean; remaining: number; target: Address | null };
 
 export interface OutLine {
   kind: 'output' | 'error';
@@ -49,6 +61,8 @@ export interface RunResult {
   clear?: boolean;
   /** Desplazamiento en DS que muestra `d` o edita `e`: la ventana de datos se mueve ahí. */
   dataFocus?: number;
+  /** El programa espera una tecla: lo que escribió en la línea que quedó a medias ("Nombre: "). */
+  partial?: string;
 }
 
 /** Límite de `g` para no congelar la pestaña. */
@@ -62,6 +76,8 @@ export function createCommandState(m: Machine): CommandState {
     dumpAddr: null,
     editAddr: { seg: m.sregs[DS], off: 0 },
     editReg: null,
+    job: null,
+    console: null,
   };
 }
 
@@ -73,6 +89,8 @@ export function promptFor(m: Machine, state: CommandState): string {
       return `${hex4(state.asmAddr.seg)}:${hex4(state.asmAddr.off)} `;
     case 'register':
       return ':';
+    case 'input':
+      return '';
     case 'edit': {
       const { seg, off } = state.editAddr;
       return `${hex4(seg)}:${hex4(off)}  ${hex2(readByte(m, seg, off))}.`;
@@ -244,19 +262,39 @@ function dumpLine(m: Machine, seg: number, row: number, from: number, to: number
 
 // ---------------------------------------------------------------- Ejecución
 
-type RunEnd = 'step' | 'terminated' | 'stopped';
+/** `waiting`: el programa espera una tecla; CS:IP quedó en el manejador, que se repite cuando llegue. */
+type RunEnd = 'step' | 'terminated' | 'stopped' | 'waiting';
 
-/** Ejecuta una instrucción resolviendo las interrupciones con dos.ts. */
+/** Ejecuta una instrucción. Las interrupciones van por la tabla de vectores, salvo las que atiende DEBUG. */
 function runOne(m: Machine, output: Output, lines: OutLine[]): { end: RunEnd; brk: boolean } {
   const at = { seg: m.sregs[CS], off: m.ip };
   const result = step(m);
   switch (result.kind) {
     case 'ok':
       return { end: 'step', brk: false };
-    case 'int': {
-      const r = handleInterrupt(m, result.n, output);
-      if (r === 'terminate') return { end: 'terminated', brk: false };
-      return { end: 'step', brk: r === 'break' };
+    case 'int':
+      // Los puntos de parada los atiende DEBUG
+      if (result.n === 3) return { end: 'step', brk: true };
+      // La división por cero la atiende DOS, mientras nadie haya instalado otro manejador
+      if (result.n === 0 && isBootVector(m, 0)) {
+        divideOverflow(output);
+        return { end: 'terminated', brk: false };
+      }
+      raiseInterrupt(m, result.n);
+      return { end: 'step', brk: false };
+    case 'service': {
+      const r = runService(m, result.id, output);
+      if (r === 'wait') {
+        // Vuelve a FE 38 nnnn: al reanudar, el manejador pide el servicio otra vez
+        m.ip = (m.ip - 4) & 0xffff;
+        return { end: 'waiting', brk: false };
+      }
+      if (r === 'terminate') {
+        // Se deshace la interrupción: CS:IP queda después del INT que terminó el programa
+        returnFromInterrupt(m);
+        return { end: 'terminated', brk: false };
+      }
+      return { end: 'step', brk: false };
     }
     case 'halt':
       return { end: 'step', brk: true };
@@ -286,7 +324,15 @@ function takeStart(m: Machine, tokens: Token[]): Token[] {
 }
 
 /** Instrucciones que `p` ejecuta enteras: sigue hasta que la ejecución vuelve a la instrucción siguiente. */
-const PROCEED = new Set(['CALL', 'CALL FAR', 'LOOP', 'LOOPZ', 'LOOPNZ']);
+const PROCEED = new Set(['CALL', 'CALL FAR', 'LOOP', 'LOOPZ', 'LOOPNZ', 'INT', 'INTO']);
+
+/** Número de interrupción de un INT o un INTO; null si es otra instrucción. */
+function interruptNumber(instr: Instr): number | null {
+  if (instr.mnem === 'INTO') return 4;
+  const op = instr.operands[0];
+  if (instr.mnem !== 'INT' || !op) return null;
+  return op.kind === 'const' || op.kind === 'imm' ? op.value : null;
+}
 
 /** La instrucción en CS:IP sin sus prefijos, y cuántos bytes ocupa con ellos. */
 function instructionAt(m: Machine): { instr: Instr; length: number } {
@@ -299,59 +345,101 @@ function instructionAt(m: Machine): { instr: Instr; length: number } {
   return { instr: decode(m, m.sregs[CS], m.ip), length };
 }
 
-/** Un paso de `p`: como `t`, salvo que una llamada o un LOOP se ejecutan hasta volver a la siguiente instrucción. */
-function proceedOne(m: Machine, output: Output, lines: OutLine[]): RunEnd {
-  const { instr, length } = instructionAt(m);
-  if (!PROCEED.has(instr.mnem)) return runOne(m, output, lines).end;
-  const seg = m.sregs[CS];
-  const back = (m.ip + length) & 0xffff;
+/** Ejecuta hasta que CS:IP llega a `target`: una llamada, un LOOP o un INT enteros. */
+function runPast(m: Machine, target: Address, output: Output, lines: OutLine[]): RunEnd {
   for (let i = 0; i < MAX_STEPS; i++) {
     const { end, brk } = runOne(m, output, lines);
     if (end !== 'step' || brk) return end;
-    if (m.sregs[CS] === seg && m.ip === back) return 'step';
+    if (m.sregs[CS] === target.seg && m.ip === target.off) return 'step';
   }
   output.writeLine(`Ejecución detenida tras ${MAX_STEPS.toLocaleString('es')} instrucciones`);
   return 'step';
 }
 
-/** `t` y `p`: ejecutan `cantidad` pasos y muestran los registros después de cada uno. */
-function trace(m: Machine, tokens: Token[], proceed = false): OutLine[] {
-  const rest = takeStart(m, tokens);
-  if (rest.length > 1) throw new CommandError(rest[1].col);
-  const count = rest[0] ? hexValue(rest[0]) : 1;
-  if (count === 0) throw new CommandError(rest[0].col);
-  const lines: OutLine[] = [];
-  const output = new Output();
-  for (let i = 0; i < count; i++) {
-    const end = proceed ? proceedOne(m, output, lines) : runOne(m, output, lines).end;
-    drain(output, lines);
-    if (end === 'terminated' || end === 'stopped') break;
-    lines.push(...registerDump(m).map(out));
-  }
-  return lines;
+/**
+ * Dónde termina el paso que empieza en CS:IP, si no es una sola instrucción. Para `t`, un INT a un
+ * servicio del simulador (su vector es el de arranque) se resuelve entero; a un manejador propio, entra.
+ * Para `p`, además, una llamada, un LOOP o cualquier INT se ejecutan enteros.
+ */
+function stepTarget(m: Machine, proceed: boolean): Address | null {
+  const { instr, length } = instructionAt(m);
+  const n = interruptNumber(instr);
+  const whole = proceed ? PROCEED.has(instr.mnem) && n !== 3 : n !== null && n !== 3 && isBootVector(m, n);
+  return whole ? { seg: m.sregs[CS], off: (m.ip + length) & 0xffff } : null;
 }
 
-function go(m: Machine, tokens: Token[]): OutLine[] {
-  const rest = takeStart(m, tokens);
-  const breakpoints = new Set(rest.map((t) => parseAddress(m, t, CS)).map((a) => a.seg * 0x10000 + a.off));
-  const lines: OutLine[] = [];
-  const output = new Output();
-  for (let i = 0; i < MAX_STEPS; i++) {
+/** Los pasos de `t` y `p` que faltan, con los registros después de cada uno. */
+function runTrace(m: Machine, job: Extract<Job, { kind: 'trace' }>, output: Output, lines: OutLine[]): RunEnd {
+  while (job.remaining > 0) {
+    job.target ??= stepTarget(m, job.proceed);
+    const end = job.target ? runPast(m, job.target, output, lines) : runOne(m, output, lines).end;
+    if (end === 'waiting') return end;
+    job.target = null;
+    job.remaining--;
+    drain(output, lines);
+    if (end === 'terminated' || end === 'stopped') return end;
+    lines.push(...registerDump(m).map(out));
+  }
+  return 'step';
+}
+
+/** `g` hasta que el programa termina, llega a un punto de parada o al límite de instrucciones. */
+function runGo(m: Machine, job: Extract<Job, { kind: 'go' }>, output: Output, lines: OutLine[]): RunEnd {
+  for (; job.steps < MAX_STEPS; job.steps++) {
     const { end, brk } = runOne(m, output, lines);
+    if (end === 'waiting') return end;
     if (end === 'terminated' || end === 'stopped') {
       drain(output, lines);
-      return lines;
+      return end;
     }
-    if (brk || breakpoints.has(m.sregs[CS] * 0x10000 + m.ip)) {
+    if (brk || job.breakpoints.has(m.sregs[CS] * 0x10000 + m.ip)) {
       drain(output, lines);
       lines.push(...registerDump(m).map(out));
-      return lines;
+      return 'step';
     }
   }
   drain(output, lines);
   lines.push(out(`Ejecución detenida tras ${MAX_STEPS.toLocaleString('es')} instrucciones`));
   lines.push(...registerDump(m).map(out));
-  return lines;
+  return 'step';
+}
+
+/**
+ * Corre un `g`, `t` o `p`, nuevo o en pausa. Si el programa pide una tecla que no hay, queda en pausa
+ * (modo `input`) con lo que escribió hasta ahí; la tecla que llegue lo hace seguir.
+ */
+function runJob(m: Machine, state: CommandState, job: Job): RunResult {
+  const output = state.console ?? new Output();
+  const lines: OutLine[] = [];
+  const end = job.kind === 'go' ? runGo(m, job, output, lines) : runTrace(m, job, output, lines);
+  if (end === 'waiting') {
+    state.job = job;
+    state.console = output;
+    state.mode = 'input';
+    // Las líneas que el programa ya completó se muestran ahora; la que quedó a medias, como `partial`
+    lines.push(...output.lines.map(out));
+    output.lines = [];
+    return { output: lines, partial: output.partial };
+  }
+  state.job = null;
+  state.console = null;
+  state.mode = 'command';
+  return { output: lines };
+}
+
+/** `t` y `p`: ejecutan `cantidad` pasos y muestran los registros después de cada uno. */
+function trace(m: Machine, state: CommandState, tokens: Token[], proceed = false): RunResult {
+  const rest = takeStart(m, tokens);
+  if (rest.length > 1) throw new CommandError(rest[1].col);
+  const count = rest[0] ? hexValue(rest[0]) : 1;
+  if (count === 0) throw new CommandError(rest[0].col);
+  return runJob(m, state, { kind: 'trace', proceed, remaining: count, target: null });
+}
+
+function go(m: Machine, state: CommandState, tokens: Token[]): RunResult {
+  const rest = takeStart(m, tokens);
+  const breakpoints = new Set(rest.map((t) => parseAddress(m, t, CS)).map((a) => a.seg * 0x10000 + a.off));
+  return runJob(m, state, { kind: 'go', breakpoints, steps: 0 });
 }
 
 function unassemble(m: Machine, state: CommandState, tokens: Token[]): OutLine[] {
@@ -550,9 +638,9 @@ function runCommand(m: Machine, state: CommandState, line: string): RunResult {
       return { output: [out(`${name} ${hex4(readRegister(m, name))}`)] };
     }
     case 't':
-      return { output: trace(m, tokens) };
+      return trace(m, state, tokens);
     case 'g':
-      return { output: go(m, tokens) };
+      return go(m, state, tokens);
     case 'd': {
       const { lines, focus } = dump(m, state, tokens);
       return { output: lines, dataFocus: focus };
@@ -572,7 +660,7 @@ function runCommand(m: Machine, state: CommandState, line: string): RunResult {
       return { output: [], dataFocus: addr.off };
     }
     case 'p':
-      return { output: trace(m, tokens, true) };
+      return trace(m, state, tokens, true);
     case 'h':
       return { output: hexArith(tokens, argsCol + argsText.length) };
     case 'f':
@@ -601,6 +689,10 @@ export function run(m: Machine, state: CommandState, line: string): RunResult {
       return runRegister(m, state, line, prompt);
     case 'edit':
       return runEdit(m, state, line, prompt);
+    case 'input':
+      // La línea es una tecla para el programa, que sigue donde se había pausado
+      m.keyboard.keys.push(keyFromLine(line));
+      return runJob(m, state, state.job!);
     case 'command':
       try {
         return runCommand(m, state, line);

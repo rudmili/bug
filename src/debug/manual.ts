@@ -58,6 +58,9 @@ const PAGES: Record<string, ManPage> = {
       '',
       'Con =dirección, primero mueve CS:IP a esa dirección.',
       'Se detiene si el programa termina (por ejemplo con INT 20 o RET a DOS).',
+      '',
+      'Un INT de DOS o del BIOS se resuelve en un paso. Si su vector apunta a un',
+      'manejador tuyo (instalado con INT 21 AH=25), `t` entra en él.',
     ],
     examples: [
       't             un paso',
@@ -69,9 +72,10 @@ const PAGES: Record<string, ManPage> = {
     name: 'p - ejecuta paso a paso sin entrar en llamadas (proceed)',
     synopsis: ['p [=dirección] [cantidad]'],
     description: [
-      'Como `t`, pero una llamada (CALL) o un bucle (LOOP, LOOPZ, LOOPNZ) se',
-      'ejecutan enteros: se detiene recién en la instrucción que sigue. Sirve',
-      'para no recorrer paso a paso una subrutina que ya funciona.',
+      'Como `t`, pero una llamada (CALL), una interrupción (INT) o un bucle',
+      '(LOOP, LOOPZ, LOOPNZ) se ejecutan enteros: se detiene recién en la',
+      'instrucción que sigue. Sirve para no recorrer paso a paso una subrutina',
+      'que ya funciona.',
       '',
       'Con =dirección, primero mueve CS:IP a esa dirección.',
     ],

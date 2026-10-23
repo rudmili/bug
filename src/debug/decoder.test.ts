@@ -83,7 +83,9 @@ describe('decoder', () => {
 
   it('un opcode no definido es DB de un byte', () => {
     expect(at([0x0f, 0x00])).toMatchObject({ mnem: 'DB', length: 1, undefined: true, operands: [{ kind: 'imm', value: 0x0f }] });
-    expect(at([0xf6, 0xc8])).toMatchObject({ mnem: 'DB', length: 1 });
+    // Campo vacío de un grupo: ??? con su operando, como FE38 en los manejadores de DOSBox
+    expect(at([0xf6, 0xc8])).toMatchObject({ mnem: '???', length: 2, undefined: true, operands: [{ kind: 'reg', index: 0 }] });
+    expect(at([0xfe, 0x38])).toMatchObject({ mnem: '???', length: 2, undefined: true, operands: [{ kind: 'mem', rm: 0 }] });
     expect(at([0x8d, 0xc0])).toMatchObject({ mnem: 'DB', length: 1 });
   });
 });

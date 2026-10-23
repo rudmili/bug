@@ -17,6 +17,8 @@ export function createDebugSession(): DebugSession {
   let commands: CommandState;
   let viewState: ViewState;
   let lines: TerminalLine[];
+  /** Lo que el programa escribió en la línea que quedó a medias mientras espera una tecla. */
+  let partial: { id: number; text: string } | null;
   let view: DebugView;
   // Los ids siguen creciendo después de q para que React no reutilice keys
   let nextId = 0;
@@ -26,6 +28,7 @@ export function createDebugSession(): DebugSession {
     commands = createCommandState(machine);
     viewState = createViewState();
     lines = [];
+    partial = null;
     view = render(snapshot(machine), undefined);
   }
 
@@ -36,9 +39,11 @@ export function createDebugSession(): DebugSession {
       prev,
       writes,
       dataFocus,
-      lines,
+      // La línea a medias se ve al final, con un id fijo mientras crece con el eco de las teclas
+      lines: partial ? [...lines, { id: partial.id, kind: 'output', text: partial.text }] : lines,
       prompt: promptFor(machine, commands),
       state: viewState,
+      waiting: commands.mode === 'input',
     });
     viewState = built.state;
     return built.view;
@@ -49,7 +54,9 @@ export function createDebugSession(): DebugSession {
   return {
     getView: () => view,
     submit(line: string): DebugView {
-      const echo: TerminalLine = { id: nextId++, kind: 'command', text: promptFor(machine, commands) + line };
+      // Una tecla para el programa no se repite en la terminal: si corresponde, se ve por su eco
+      const waiting = commands.mode === 'input';
+      const echo: TerminalLine[] = waiting ? [] : [{ id: nextId++, kind: 'command', text: promptFor(machine, commands) + line }];
       const prev = snapshot(machine);
       clearWrites(machine);
       let result: RunResult;
@@ -67,7 +74,8 @@ export function createDebugSession(): DebugSession {
       }
       const added = result.output.map((o): TerminalLine => ({ id: nextId++, kind: o.kind, text: o.text }));
       // `clear` deja la terminal vacía (vuelve a verse la guía de comandos), sin el eco de la línea
-      lines = result.clear ? [] : [...lines, echo, ...added].slice(-MAX_LINES);
+      lines = result.clear ? [] : [...lines, ...echo, ...added].slice(-MAX_LINES);
+      partial = result.partial ? { id: partial?.id ?? nextId++, text: result.partial } : null;
       view = render(prev, result.dataFocus);
       return view;
     },

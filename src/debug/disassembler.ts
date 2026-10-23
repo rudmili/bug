@@ -45,7 +45,7 @@ function operandText(op: Operand): string {
 /** BYTE PTR o WORD PTR solo cuando ningún operando es un registro que fije el tamaño. */
 function needsPtr(instr: Instr): boolean {
   const mem = instr.operands.find((o) => o.kind === 'mem');
-  if (!mem || mem.size === 32 || IMPLICIT_WORD.has(instr.mnem)) return false;
+  if (!mem || mem.size === 32 || IMPLICIT_WORD.has(instr.mnem) || instr.mnem === '???') return false;
   if (instr.mnem === 'LEA') return false;
   const sizing = instr.operands.filter((o) => {
     if (o.kind === 'sreg') return true;

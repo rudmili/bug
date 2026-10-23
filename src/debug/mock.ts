@@ -99,6 +99,7 @@ function baseView(lines: TerminalLine[]): DebugView {
       position: 0,
     },
     restarted: false,
+    waiting: false,
   };
 }
 

@@ -20,13 +20,15 @@ import { AX, BP, BX, CS, CX, DI, DS, DX, ES, SI, SP, SS, getReg8, setFlags, setR
 import type { Machine } from './state';
 
 /**
- * Ejecución de una instrucción. No conoce DOS: ante una interrupción devuelve un aviso
- * y quien llama (commands) se lo pasa a dos.ts.
+ * Ejecución de una instrucción. No conoce DOS: ante una interrupción devuelve un aviso y quien
+ * llama (commands) decide si la atiende DEBUG o si la despacha por la tabla con raiseInterrupt.
  */
 export type StepResult =
   | { kind: 'ok' }
   /** INT n, INT 3, INTO con OF, o interrupción 0 por división. IP ya apunta a la siguiente instrucción. */
   | { kind: 'int'; n: number }
+  /** FE 38 nnnn: un manejador pide el servicio nnnn del simulador (como en DOSBox). IP ya apunta a la siguiente. */
+  | { kind: 'service'; id: number }
   | { kind: 'halt' }
   /** Opcode no definido: IP no se mueve. */
   | { kind: 'undefined'; byte: number };
@@ -131,6 +133,23 @@ function flagsWord(m: Machine): number {
     (f.CF ? 0x0001 : 0) | (f.PF ? 0x0004 : 0) | (f.AF ? 0x0010 : 0) | (f.ZF ? 0x0040 : 0) |
     (f.SF ? 0x0080 : 0) | (f.TF ? 0x0100 : 0) | (f.IF ? 0x0200 : 0) | (f.DF ? 0x0400 : 0) | (f.OF ? 0x0800 : 0)
   );
+}
+
+/** Interrupción como en el 8086: apila FLAGS, CS e IP, apaga IF y TF, y salta al vector de 0000:n*4. */
+export function raiseInterrupt(m: Machine, n: number): void {
+  push(m, flagsWord(m));
+  push(m, m.sregs[CS]);
+  push(m, m.ip);
+  setFlags(m, { IF: false, TF: false });
+  m.ip = readWord(m, 0, n * 4);
+  m.sregs[CS] = readWord(m, 0, n * 4 + 2);
+}
+
+/** IRET: vuelve de una interrupción. */
+export function returnFromInterrupt(m: Machine): void {
+  m.ip = pop(m);
+  m.sregs[CS] = pop(m);
+  setFlagsWord(m, pop(m));
 }
 
 function setFlagsWord(m: Machine, w: number): void {
@@ -474,9 +493,7 @@ function execute(m: Machine, instr: Instr, rep: string | null, segOverride: numb
       if (a) m.regs[SP] = (m.regs[SP] + read(m, a)) & 0xffff;
       break;
     case 'IRET':
-      m.ip = pop(m);
-      m.sregs[CS] = pop(m);
-      setFlagsWord(m, pop(m));
+      returnFromInterrupt(m);
       break;
     case 'LOOP':
     case 'LOOPZ':
@@ -572,7 +589,14 @@ export function step(m: Machine): StepResult {
   // Un máximo de prefijos evita un bucle infinito con memoria llena de prefijos
   for (let i = 0; i < 16; i++) {
     const instr = decode(m, m.sregs[CS], m.ip, segOverride);
-    if (instr.undefined) return { kind: 'undefined', byte: instr.bytes[0] };
+    if (instr.undefined) {
+      if (instr.bytes[0] === 0xfe && instr.bytes[1] === 0x38) {
+        const id = readWord(m, m.sregs[CS], m.ip + 2);
+        m.ip = (m.ip + 4) & 0xffff;
+        return { kind: 'service', id };
+      }
+      return { kind: 'undefined', byte: instr.bytes[0] };
+    }
     m.ip = (m.ip + instr.length) & 0xffff;
     if (instr.prefix === 'seg') segOverride = instr.sreg ?? null;
     else if (instr.prefix === 'rep') rep = instr.mnem;

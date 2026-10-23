@@ -105,7 +105,7 @@ export interface TerminalLine {
 
 export interface DebugView {
   lines: TerminalLine[];
-  /** Prompt del campo de entrada: "-" en modo comando, "073F:0102 " al ensamblar, ":" al editar un registro. */
+  /** Prompt del campo de entrada: "-" en modo comando, "073F:0102 " al ensamblar, ":" al editar un registro, vacío si el programa espera una tecla. */
   prompt: string;
   registers: RegisterView[];
   flags: FlagView[];
@@ -114,6 +114,11 @@ export interface DebugView {
   stack: StackViewModel;
   /** La última línea fue `q`: la máquina volvió al estado inicial y lo escrito antes ya no influye. */
   restarted: boolean;
+  /**
+   * El programa espera una tecla (INT 21 AH=01, 0A…, INT 16). Cada línea que se envíe es una tecla:
+   * un carácter, '' para Enter, o el nombre de una tecla sin carácter entre llaves ("{Up}", "{F1}").
+   */
+  waiting: boolean;
 }
 
 export type MemoryWindowName = 'code' | 'data';

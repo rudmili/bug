@@ -233,7 +233,7 @@ export interface Instr {
   prefix?: PrefixKind;
   /** Para prefijos de segmento. */
   sreg?: number;
-  /** Opcode no definido en el 8086 (se muestra como DB). */
+  /** Opcode no definido en el 8086: se muestra como DB, o como ??? si es un campo vacío de un grupo. */
   undefined?: boolean;
 }
 
@@ -270,11 +270,13 @@ export function decode(m: Machine, cs: number, ip: number, segOverride: number |
   if (entry === null) return undefinedInstr(opcode);
 
   let modrm: number | null = null;
+  // Un grupo sin instrucción para ese campo reg: DEBUG muestra "???" con el operando (FE38 = ??? [BX+SI])
+  let invalid = false;
   if (isGroup(entry)) {
     modrm = next();
     const sub: OpEntry | null = entry.group[(modrm >> 3) & 7];
-    if (sub === null) return undefinedInstr(opcode);
-    entry = sub;
+    invalid = sub === null;
+    entry = sub ?? { mnem: '???', ops: ['Eb'] };
   }
   if (entry.prefix) {
     return { mnem: entry.mnem, operands: [], length: 1, bytes, prefix: entry.prefix, sreg: entry.sreg };
@@ -361,5 +363,7 @@ export function decode(m: Machine, cs: number, ip: number, segOverride: number |
     }
   }
 
-  return { mnem: entry.mnem, operands, length: bytes.length, bytes };
+  return invalid
+    ? { mnem: entry.mnem, operands, length: bytes.length, bytes, undefined: true }
+    : { mnem: entry.mnem, operands, length: bytes.length, bytes };
 }

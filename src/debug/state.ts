@@ -30,8 +30,8 @@ export interface Flags {
 
 export type FlagName = keyof Flags;
 
-/** Quién escribió en memoria: una instrucción (data), la pila (PUSH, CALL, INT), `a` (code) o `e` (edit). */
-export type WriteKind = 'data' | 'stack' | 'code' | 'edit';
+/** Quién escribió en memoria: una instrucción (data), la pila (PUSH, CALL, INT), `a` (code), `e` (edit) o un servicio de DOS (system). */
+export type WriteKind = 'data' | 'stack' | 'code' | 'edit' | 'system';
 
 export interface WriteRecord {
   /** Dirección física. */
@@ -42,6 +42,26 @@ export interface WriteRecord {
 }
 
 export const MEMORY_SIZE = 0x100000;
+
+/** Una tecla como la entrega el BIOS: código ASCII (0 en las teclas extendidas) y código de tecla. */
+export interface Key {
+  ascii: number;
+  scan: number;
+}
+
+/** El teclado: lo que el programa todavía no leyó y el estado de las lecturas en curso. */
+export interface Keyboard {
+  /** Teclas pulsadas que el programa todavía no leyó. */
+  keys: Key[];
+  /** Código de tecla pendiente: DOS entrega una tecla extendida en dos lecturas, primero 00 y después el código. */
+  pendingScan: number | null;
+  /** Caracteres ya escritos en el buffer de INT 21 AH=0A, mientras se edita la línea; null si no hay ninguna en curso. */
+  lineLength: number | null;
+  /** Consultas seguidas sin tecla (AH=0B, AH=06, INT 16 AH=01): muchas pausan la ejecución a esperar una. */
+  emptyPolls: number;
+  /** AH=0C ya vació el buffer: al reanudar tras esperar una tecla no lo vuelve a vaciar. */
+  flushed: boolean;
+}
 
 export interface Machine {
   /** AX CX DX BX SP BP SI DI */
@@ -54,6 +74,7 @@ export interface Machine {
   mem: Uint8Array;
   /** Escrituras desde la última vez que se vació. */
   writes: WriteRecord[];
+  keyboard: Keyboard;
 }
 
 /** Segmento donde DOS carga a DEBUG en DOSBox (CS, DS, SS y ES). */
@@ -72,6 +93,7 @@ export function createMachine(): Machine {
     flags: { CF: false, PF: false, AF: false, ZF: false, SF: false, TF: false, IF: true, DF: false, OF: false },
     mem: new Uint8Array(MEMORY_SIZE),
     writes: [],
+    keyboard: { keys: [], pendingScan: null, lineLength: null, emptyPolls: 0, flushed: false },
   };
 }
 

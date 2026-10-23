@@ -130,6 +130,8 @@ export interface BuildInput {
   lines: TerminalLine[];
   prompt: string;
   state: ViewState;
+  /** El programa espera una tecla. */
+  waiting?: boolean;
 }
 
 export function buildView(input: BuildInput): { view: DebugView; state: ViewState } {
@@ -203,6 +205,7 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
     stack: stackView(m),
     // Lo marca session cuando la línea fue `q`
     restarted: false,
+    waiting: input.waiting ?? false,
   };
   return { view, state: next };
 }

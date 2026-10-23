@@ -314,6 +314,93 @@ describe('commands: p', () => {
   });
 });
 
+describe('commands: interrupciones', () => {
+  it('la tabla de vectores es la de DOSBox', () => {
+    expect(session().type('d 0:0 l 10')).toEqual([
+      '0000:0000  60 10 00 F0 08 00 70 00-08 00 70 00 08 00 70 00   `.....p...p...p.',
+    ]);
+    expect(session().type('d 0:80 l 8')).toEqual(['0000:0080  80 14 00 F0 A0 14 00 F0                           ........']);
+  });
+
+  it('los manejadores de F000 se desensamblan como en DOSBox', () => {
+    expect(session().type('u f000:1060 l 4')).toEqual([
+      'F000:1060 FE38          ???     [BX+SI]',
+      'F000:1062 0300          ADD     AX,[BX+SI]',
+    ]);
+    expect(session().type('u f000:14a0 l 8')).toEqual([
+      'F000:14A0 FB            STI',
+      'F000:14A1 FE38          ???     [BX+SI]',
+      'F000:14A3 2500CF        AND     AX,CF00',
+      'F000:14A6 CB            RETF',
+      'F000:14A7 51            PUSH    CX',
+    ]);
+  });
+
+  it('g pasa por el manejador de INT 21 y el programa termina igual que antes', () => {
+    const s = session();
+    s.type('a', 'mov dl,41', 'mov ah,2', 'int 21', 'int 20', '');
+    expect(s.type('g')).toEqual(['A', 'Program terminated normally']);
+    // Al terminar se deshace la interrupción: CS:IP después del INT 20, la pila como estaba
+    expect([hex(s.m.sregs[1]), hex(s.m.ip), hex(s.m.regs[SP])]).toEqual(['073F', '0108', '00FD']);
+  });
+
+  it('t sobre un INT de DOS lo resuelve en un paso', () => {
+    const s = session();
+    s.type('a', 'mov dl,41', 'mov ah,2', 'int 21', '');
+    const lines = s.type('t 3');
+    expect(lines[6]).toBe('A');
+    expect(hex(s.m.ip)).toBe('0106');
+    expect(hex(s.m.regs[SP])).toBe('00FD');
+  });
+
+  it('un manejador propio instalado con AH=25: t entra, IRET vuelve y p lo ejecuta entero', () => {
+    const s = session();
+    // Manejador en 0300: pone BX en 7 y vuelve
+    s.type('a 300', 'mov bx,7', 'iret', '');
+    s.type('a 100', 'mov dx,300', 'mov ax,2560', 'int 21', 'int 60', 'int 60', '');
+    s.type('t 3');
+    s.type('t');
+    // Entró al manejador: CS:IP en 0300 y FLAGS, CS e IP apilados
+    expect([hex(s.m.ip), hex(s.m.regs[SP])]).toEqual(['0300', '00F7']);
+    expect(s.m.flags.IF).toBe(false);
+    s.type('t 2');
+    expect([hex(s.m.ip), hex(s.m.regs[SP]), s.m.regs[BX]]).toEqual(['010A', '00FD', 7]);
+    expect(s.m.flags.IF).toBe(true);
+
+    s.m.regs[BX] = 0;
+    s.type('p');
+    expect([hex(s.m.ip), s.m.regs[BX]]).toEqual(['010C', 7]);
+  });
+
+  it('con un manejador propio en el vector 0, la división por cero va a él', () => {
+    const s = session();
+    s.type('a 300', 'mov cx,1', 'int 20', '');
+    s.type('e 0:0 0 3 3f 7');
+    s.type('a', 'mov bl,0', 'div bl', '');
+    expect(s.type('g')).toEqual(['Program terminated normally']);
+    expect(s.m.regs[CX]).toBe(1);
+  });
+
+  it('sin manejador propio, sigue siendo Divide overflow', () => {
+    const s = session();
+    s.type('a', 'mov bl,0', 'div bl', '');
+    expect(s.type('g')).toEqual(['Divide overflow', 'Program terminated normally']);
+  });
+
+  it('INT 3 sigue deteniendo g', () => {
+    const s = session();
+    s.type('a', 'int 3', 'int 20', '');
+    expect(s.type('g')).toHaveLength(3);
+    expect(hex(s.m.ip)).toBe('0101');
+  });
+
+  it('una interrupción del BIOS sin implementar vuelve sin hacer nada', () => {
+    const s = session();
+    s.type('a', 'int 10', 'int 20', '');
+    expect(s.type('g')).toEqual(['Program terminated normally']);
+  });
+});
+
 describe('commands: otros', () => {
   it('comando desconocido es error bajo la letra', () => {
     expect(session().type('x')).toEqual([' ^ Error']);
