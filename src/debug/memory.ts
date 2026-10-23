@@ -1,3 +1,5 @@
+import { hostClock, startClock } from './clock';
+import type { DateTime } from './clock';
 import { INITIAL_SEGMENT, MEMORY_SIZE, createMachine } from './state';
 import type { Machine, WriteKind } from './state';
 
@@ -129,9 +131,13 @@ export function isBootVector(m: Machine, n: number): boolean {
 
 // ---------------------------------------------------------------- Arranque
 
-/** Máquina inicial: la tabla de vectores y sus manejadores, el PSP en 073F:0000 y ceros desde 0100, salvo los restos de DOS. */
-export function bootMachine(): Machine {
+/**
+ * Máquina inicial: la tabla de vectores y sus manejadores, el PSP en 073F:0000 y ceros desde 0100, salvo
+ * los restos de DOS. El reloj arranca en `start`, como DOSBox con la hora de la PC.
+ */
+export function bootMachine(start: DateTime = hostClock()): Machine {
   const m = createMachine();
+  startClock(m, start);
   BOOT_VECTORS.forEach(([seg, off], n) => {
     const at = phys(0, n * 4);
     m.mem.set([off & 0xff, off >> 8, seg & 0xff, seg >> 8], at);

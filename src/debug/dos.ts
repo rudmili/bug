@@ -1,5 +1,6 @@
+import { addDays, clockNow, isDateValid, readTicks, takeMidnight, ticksToTime, timeToTicks, weekday, writeTicks } from './clock';
 import { SERVICE_CRITICAL, SERVICE_CTRL_C, SERVICE_TERMINATE, readByte, readVector, readWord, writeByte, writeWord } from './memory';
-import { BX, DS, DX, ES, SP, SS, getReg8, setReg8 } from './state';
+import { AX, BX, CX, DS, DX, ES, SP, SS, getReg8, setReg8 } from './state';
 import type { Key, Machine } from './state';
 
 /**
@@ -74,6 +75,7 @@ export const TERMINATED = 'Program terminated normally';
 /** Números de servicio de DOSBox: el manejador del servicio n está en F000:1000 + n * 20h. */
 export const SERVICE_INT10 = 0x18;
 export const SERVICE_INT16 = 0x0f;
+export const SERVICE_INT1A = 0x12;
 export const SERVICE_INT20 = 0x24;
 export const SERVICE_INT21 = 0x25;
 
@@ -100,15 +102,20 @@ function ctrlC(out: Output): ServiceResult {
 
 // ---------------------------------------------------------------- Teclado
 
+const CF_MASK = 0x0001;
+const ZF_MASK = 0x0040;
+
 /**
- * ZF al volver de la interrupción. El manejador termina con IRET, que recupera FLAGS de la pila:
- * hay que cambiarlo ahí (FLAGS quedó en SS:SP+4, debajo de IP y CS), como hace DOSBox.
+ * Una bandera al volver de la interrupción. El manejador termina con IRET, que recupera FLAGS de la pila:
+ * hay que cambiarla ahí (FLAGS quedó en SS:SP+4, debajo de IP y CS), como hace DOSBox.
  */
-function setReturnZF(m: Machine, zf: boolean): void {
+function setReturnFlag(m: Machine, mask: number, on: boolean): void {
   const at = (m.regs[SP] + 4) & 0xffff;
   const flags = readWord(m, m.sregs[SS], at);
-  writeWord(m, m.sregs[SS], at, zf ? flags | 0x0040 : flags & ~0x0040, 'system');
+  writeWord(m, m.sregs[SS], at, on ? flags | mask : flags & ~mask, 'system');
 }
+
+const setReturnZF = (m: Machine, zf: boolean) => setReturnFlag(m, ZF_MASK, zf);
 
 /** Una consulta sin tecla. Devuelve true si ya fueron demasiadas y hay que pausar a esperar. */
 function emptyPoll(m: Machine): boolean {
@@ -299,13 +306,110 @@ function int10(m: Machine, out: Output): ServiceResult {
   return 'continue';
 }
 
+// ---------------------------------------------------------------- Reloj
+
+const bcd = (n: number) => (Math.floor(n / 10) << 4) | n % 10;
+
+/** INT 1Ah, el reloj del BIOS: los ticks desde medianoche y el reloj de tiempo real (en BCD). */
+function int1a(m: Machine): ServiceResult {
+  switch (getReg8(m, 4)) {
+    case 0x00: {
+      // CX:DX = ticks; AL = cuántas veces pasó la medianoche desde la última lectura, y la marca se borra
+      const ticks = readTicks(m);
+      setReg8(m, 0, takeMidnight(m));
+      m.regs[CX] = ticks >>> 16;
+      m.regs[DX] = ticks & 0xffff;
+      return 'continue';
+    }
+    case 0x01:
+      writeTicks(m, ((m.regs[CX] << 16) | m.regs[DX]) >>> 0);
+      return 'continue';
+    case 0x02: {
+      // Hora: CH horas, CL minutos, DH segundos, DL=0 (sin horario de verano)
+      const t = clockNow(m);
+      m.regs[CX] = (bcd(t.hour) << 8) | bcd(t.minute);
+      m.regs[DX] = bcd(t.second) << 8;
+      setReturnFlag(m, CF_MASK, false);
+      return 'continue';
+    }
+    case 0x04: {
+      // Fecha: CH siglo, CL año, DH mes, DL día
+      const t = clockNow(m);
+      m.regs[CX] = (bcd(Math.floor(t.year / 100)) << 8) | bcd(t.year % 100);
+      m.regs[DX] = (bcd(t.month) << 8) | bcd(t.day);
+      setReturnFlag(m, CF_MASK, false);
+      return 'continue';
+    }
+    default:
+      return 'continue';
+  }
+}
+
+/** Antes de dar la fecha o la hora, DOS lee los ticks con INT 1A: si pasó la medianoche, avanza su fecha. */
+function dosTicks(m: Machine): { ticks: number; midnight: number } {
+  const midnight = takeMidnight(m);
+  if (midnight) addDays(m.clock, midnight);
+  return { ticks: readTicks(m), midnight };
+}
+
+/** INT 21 AH=2A a 2D: la fecha y la hora de DOS, como en DOSBox. */
+function int21Clock(m: Machine, ah: number): ServiceResult | null {
+  switch (ah) {
+    case 0x2a: {
+      // CX año, DH mes, DL día, AL día de la semana (0 = domingo)
+      dosTicks(m);
+      const { year, month, day } = m.clock;
+      setReg8(m, 0, weekday(year, month, day));
+      m.regs[CX] = year;
+      m.regs[DX] = (month << 8) | day;
+      return 'continue';
+    }
+    case 0x2b: {
+      const year = m.regs[CX];
+      const month = getReg8(m, 6);
+      const day = getReg8(m, 2);
+      if (!isDateValid(year, month, day)) {
+        setReg8(m, 0, 0xff);
+        return 'continue';
+      }
+      Object.assign(m.clock, { year, month, day });
+      setReg8(m, 0, 0);
+      return 'continue';
+    }
+    case 0x2c: {
+      // CH horas, CL minutos, DH segundos, DL centésimas; AL queda con lo que devolvió INT 1A
+      const { ticks, midnight } = dosTicks(m);
+      const t = ticksToTime(ticks);
+      m.regs[AX] = 0x2c00 | midnight;
+      m.regs[CX] = (t.hour << 8) | t.minute;
+      m.regs[DX] = (t.second << 8) | t.hundredths;
+      return 'continue';
+    }
+    case 0x2d: {
+      const hour = getReg8(m, 5);
+      const minute = getReg8(m, 1);
+      const second = getReg8(m, 6);
+      const hundredths = getReg8(m, 2);
+      if (hour > 23 || minute > 59 || second > 59 || hundredths > 99) {
+        setReg8(m, 0, 0xff);
+        return 'continue';
+      }
+      writeTicks(m, timeToTicks(hour, minute, second, hundredths));
+      setReg8(m, 0, 0);
+      return 'continue';
+    }
+    default:
+      return null;
+  }
+}
+
 // ---------------------------------------------------------------- INT 21
 
 function int21(m: Machine, out: Output): ServiceResult {
   const ah = getReg8(m, 4);
   const al = getReg8(m, 0);
-  const keyboard = int21Keyboard(m, out, ah);
-  if (keyboard !== null) return keyboard;
+  const handled = int21Keyboard(m, out, ah) ?? int21Clock(m, ah);
+  if (handled !== null) return handled;
   switch (ah) {
     case 0x00:
     case 0x4c:
@@ -351,6 +455,8 @@ export function runService(m: Machine, id: number, out: Output): ServiceResult {
       return int10(m, out);
     case SERVICE_INT16:
       return int16(m);
+    case SERVICE_INT1A:
+      return int1a(m);
     case SERVICE_INT20:
     case SERVICE_TERMINATE:
       return terminate(out);

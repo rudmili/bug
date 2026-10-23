@@ -8,7 +8,7 @@ import type { DebugSession, DebugView, MemoryTarget, MemoryWindowName } from './
 
 export type SessionRequest =
   /** Sesión nueva con estas líneas ya ejecutadas: así se recupera todo tras recargar. */
-  | { id: number; type: 'start'; lines: string[] }
+  | { id: number; type: 'start'; lines: string[]; clock?: string }
   | { id: number; type: 'submit'; line: string }
   /** Sesión nueva, como al abrir sin nada guardado. */
   | { id: number; type: 'reset' }
@@ -21,13 +21,13 @@ export interface SessionResponse {
 }
 
 /** Atiende los pedidos en orden; cada respuesta lleva el id del pedido. */
-export function createSessionHost(createSession: () => DebugSession = createDebugSession) {
+export function createSessionHost(createSession: (clock?: string) => DebugSession = createDebugSession) {
   let session = createSession();
   return {
     handle(request: SessionRequest): SessionResponse {
       switch (request.type) {
         case 'start': {
-          session = createSession();
+          session = createSession(request.clock);
           let view = session.getView();
           for (const line of request.lines) view = session.submit(line);
           return { id: request.id, view };

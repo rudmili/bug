@@ -63,6 +63,17 @@ export interface Keyboard {
   flushed: boolean;
 }
 
+/** El reloj: la fecha que lleva DOS y el avance hacia el próximo tick (los ticks están en 0040:006C). */
+export interface Clock {
+  year: number;
+  month: number;
+  day: number;
+  /** Pulsos del temporizador desde el último tick: cada instrucción suma los suyos (clock.ts). */
+  pulses: number;
+  /** Se completó un tick con IF=0: se suma cuando IF vuelva a 1. */
+  pending: boolean;
+}
+
 export interface Machine {
   /** AX CX DX BX SP BP SI DI */
   regs: Uint16Array;
@@ -75,6 +86,7 @@ export interface Machine {
   /** Escrituras desde la última vez que se vació. */
   writes: WriteRecord[];
   keyboard: Keyboard;
+  clock: Clock;
 }
 
 /** Segmento donde DOS carga a DEBUG en DOSBox (CS, DS, SS y ES). */
@@ -94,6 +106,8 @@ export function createMachine(): Machine {
     mem: new Uint8Array(MEMORY_SIZE),
     writes: [],
     keyboard: { keys: [], pendingScan: null, lineLength: null, emptyPolls: 0, flushed: false },
+    // bootMachine lo pone en la hora de arranque
+    clock: { year: 1980, month: 1, day: 1, pulses: 0, pending: false },
   };
 }
 

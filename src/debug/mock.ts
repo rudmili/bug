@@ -100,6 +100,7 @@ function baseView(lines: TerminalLine[]): DebugView {
     },
     restarted: false,
     waiting: false,
+    clock: '2026-10-22T09:30:00.00',
   };
 }
 

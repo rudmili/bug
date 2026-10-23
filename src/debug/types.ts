@@ -119,6 +119,12 @@ export interface DebugView {
    * un carácter, '' para Enter, o el nombre de una tecla sin carácter entre llaves ("{Up}", "{F1}").
    */
   waiting: boolean;
+  /**
+   * Fecha y hora en que arrancó la máquina ("2026-10-22T23:18:45.32", hora local): de ahí parte el reloj,
+   * que avanza con las instrucciones. Se guarda con los comandos para que repetirlos dé la misma hora.
+   * Cambia con `q`: la máquina nueva arranca a la hora que marcaba el reloj.
+   */
+  clock: string;
 }
 
 export type MemoryWindowName = 'code' | 'data';

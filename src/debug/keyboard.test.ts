@@ -149,8 +149,9 @@ describe('keyboard: t y repetición', () => {
 
   it('las teclas guardadas reproducen la misma vista', () => {
     const log = ['a', 'mov ah,1', 'int 21', 'int 20', '', 'g', 'x'];
-    const a = createDebugSession();
-    const b = createDebugSession();
+    // La misma hora de arranque: la vista la incluye
+    const a = createDebugSession('2026-10-22T10:00:00.00');
+    const b = createDebugSession('2026-10-22T10:00:00.00');
     for (const line of log) a.submit(line);
     for (const line of log) b.submit(line);
     expect(b.getView()).toEqual(a.getView());

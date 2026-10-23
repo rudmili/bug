@@ -132,6 +132,8 @@ export interface BuildInput {
   state: ViewState;
   /** El programa espera una tecla. */
   waiting?: boolean;
+  /** Hora de arranque de la sesión (DebugView.clock). */
+  clock?: string;
 }
 
 export function buildView(input: BuildInput): { view: DebugView; state: ViewState } {
@@ -206,6 +208,7 @@ export function buildView(input: BuildInput): { view: DebugView; state: ViewStat
     // Lo marca session cuando la línea fue `q`
     restarted: false,
     waiting: input.waiting ?? false,
+    clock: input.clock ?? '',
   };
   return { view, state: next };
 }

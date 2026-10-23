@@ -1,5 +1,7 @@
 import { createCommandState, promptFor, run } from './commands';
 import type { CommandState, RunResult } from './commands';
+import { clockNow, formatClock, hostClock, parseClock } from './clock';
+import type { DateTime } from './clock';
 import { bootMachine, clearWrites } from './memory';
 import { snapshot } from './state';
 import type { Machine } from './state';
@@ -12,7 +14,12 @@ import type { ViewState } from './view';
 /** Líneas que se conservan en la terminal; un programa que imprime sin parar no debe llenar el DOM. */
 export const MAX_LINES = 2000;
 
-export function createDebugSession(): DebugSession {
+/**
+ * `clock`: hora de arranque guardada con los comandos (DebugView.clock). Sin ella, o si no es válida,
+ * la máquina arranca con la hora de la PC, como DOSBox.
+ */
+export function createDebugSession(clock?: string): DebugSession {
+  let start: DateTime = (clock !== undefined && parseClock(clock)) || hostClock();
   let machine: Machine;
   let commands: CommandState;
   let viewState: ViewState;
@@ -24,7 +31,7 @@ export function createDebugSession(): DebugSession {
   let nextId = 0;
 
   function reset(): void {
-    machine = bootMachine();
+    machine = bootMachine(start);
     commands = createCommandState(machine);
     viewState = createViewState();
     lines = [];
@@ -44,6 +51,7 @@ export function createDebugSession(): DebugSession {
       prompt: promptFor(machine, commands),
       state: viewState,
       waiting: commands.mode === 'input',
+      clock: formatClock(start),
     });
     viewState = built.state;
     return built.view;
@@ -68,6 +76,8 @@ export function createDebugSession(): DebugSession {
         result = { output: [{ kind: 'error', text: `Error interno del simulador: ${message}` }] };
       }
       if (result.reset) {
+        // Como al salir de DEBUG y volver a entrar: el reloj de la PC siguió corriendo
+        start = clockNow(machine);
         reset();
         view = { ...view, restarted: true };
         return view;

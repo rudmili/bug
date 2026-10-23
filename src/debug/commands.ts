@@ -6,6 +6,7 @@ import { Output, divideOverflow, runService } from './dos';
 import { effectiveOffset, raiseInterrupt, returnFromInterrupt, step } from './executor';
 import { flagsText } from './flags';
 import { hex2, hex4, parseHex } from './hex';
+import { advanceClock } from './clock';
 import { keyFromLine } from './keyboard';
 import { manual } from './manual';
 import { isBootVector, readByte, readWord, writeByte } from './memory';
@@ -269,6 +270,8 @@ type RunEnd = 'step' | 'terminated' | 'stopped' | 'waiting';
 function runOne(m: Machine, output: Output, lines: OutLine[]): { end: RunEnd; brk: boolean } {
   const at = { seg: m.sregs[CS], off: m.ip };
   const result = step(m);
+  // El tiempo avanza con cada instrucción ejecutada (clock.ts)
+  advanceClock(m);
   switch (result.kind) {
     case 'ok':
       return { end: 'step', brk: false };

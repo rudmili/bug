@@ -128,8 +128,9 @@ describe('session: repetir el registro de comandos', () => {
   // La interfaz guarda solo las líneas escritas y las vuelve a ejecutar al recargar la página
   it('las mismas líneas reproducen exactamente la misma vista', () => {
     const log = ['a', 'mov ax,1234', 'mov [200],ax', 'int 3', '', 'e 210 "Hola"', 'g', 'clear', 'r bx', 'ff', 't =100 2', 'd 200 l 20'];
-    const first = createDebugSession();
-    const second = createDebugSession();
+    // Con la misma hora de arranque, que también se guarda
+    const first = createDebugSession('2026-10-22T10:00:00.00');
+    const second = createDebugSession('2026-10-22T10:00:00.00');
     for (const line of log) first.submit(line);
     for (const line of log) second.submit(line);
     expect(second.getView()).toEqual(first.getView());
