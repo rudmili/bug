@@ -72,6 +72,7 @@ export type ServiceResult = 'continue' | 'terminate' | 'wait';
 export const TERMINATED = 'Program terminated normally';
 
 /** Números de servicio de DOSBox: el manejador del servicio n está en F000:1000 + n * 20h. */
+export const SERVICE_INT10 = 0x18;
 export const SERVICE_INT16 = 0x0f;
 export const SERVICE_INT20 = 0x24;
 export const SERVICE_INT21 = 0x25;
@@ -213,6 +214,7 @@ function int21Keyboard(m: Machine, out: Output, ah: number): ServiceResult | nul
       const dl = getReg8(m, 2);
       if (dl !== 0xff) {
         out.writeChar(dl);
+        setReg8(m, 0, dl);
         return 'continue';
       }
       if (emptyPoll(m)) return 'wait';
@@ -233,7 +235,13 @@ function int21Keyboard(m: Machine, out: Output, ah: number): ServiceResult | nul
         kb.flushed = true;
       }
       const al = getReg8(m, 0);
-      const result = [0x01, 0x06, 0x07, 0x08, 0x0a].includes(al) ? int21Keyboard(m, out, al)! : 'continue';
+      // Con otra función solo vacía, y DOSBox deja AL=00
+      if (![0x01, 0x06, 0x07, 0x08, 0x0a].includes(al)) {
+        kb.flushed = false;
+        setReg8(m, 0, 0);
+        return 'continue';
+      }
+      const result = int21Keyboard(m, out, al)!;
       if (result !== 'wait') kb.flushed = false;
       return result;
     }
@@ -280,6 +288,17 @@ function int16(m: Machine): ServiceResult {
   }
 }
 
+// ---------------------------------------------------------------- INT 10
+
+/**
+ * INT 10h, el video del BIOS. Solo AH=0E, escribir un carácter como en una teletipo, que es lo que
+ * tiene sentido en una terminal de texto; las demás (modos, cursor, colores, píxeles) no hacen nada.
+ */
+function int10(m: Machine, out: Output): ServiceResult {
+  if (getReg8(m, 4) === 0x0e) out.writeChar(getReg8(m, 0));
+  return 'continue';
+}
+
 // ---------------------------------------------------------------- INT 21
 
 function int21(m: Machine, out: Output): ServiceResult {
@@ -291,9 +310,13 @@ function int21(m: Machine, out: Output): ServiceResult {
     case 0x00:
     case 0x4c:
       return terminate(out);
-    case 0x02:
-      out.writeChar(getReg8(m, 2));
+    case 0x02: {
+      // Como en DOSBox, AL queda con el carácter escrito (un tab, como el espacio en que se convierte)
+      const dl = getReg8(m, 2);
+      out.writeChar(dl);
+      setReg8(m, 0, dl === 0x09 ? 0x20 : dl);
       return 'continue';
+    }
     case 0x09:
       // Una cadena sin $ se corta al dar la vuelta al segmento
       for (let i = 0; i < 0x10000; i++) {
@@ -301,6 +324,8 @@ function int21(m: Machine, out: Output): ServiceResult {
         if (c === 0x24) break;
         out.writeChar(c);
       }
+      // Como en DOSBox, AL queda con el último carácter leído: el $
+      setReg8(m, 0, 0x24);
       return 'continue';
     case 0x25:
       // Instala DS:DX como manejador de la interrupción AL
@@ -322,6 +347,8 @@ function int21(m: Machine, out: Output): ServiceResult {
 /** Atiende el servicio que pidió un manejador. Los que no conoce no hacen nada, como el manejador vacío. */
 export function runService(m: Machine, id: number, out: Output): ServiceResult {
   switch (id) {
+    case SERVICE_INT10:
+      return int10(m, out);
     case SERVICE_INT16:
       return int16(m);
     case SERVICE_INT20:

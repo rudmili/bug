@@ -396,8 +396,14 @@ describe('commands: interrupciones', () => {
 
   it('una interrupción del BIOS sin implementar vuelve sin hacer nada', () => {
     const s = session();
-    s.type('a', 'int 10', 'int 20', '');
+    s.type('a', 'int 11', 'int 20', '');
     expect(s.type('g')).toEqual(['Program terminated normally']);
+  });
+
+  it('INT 10 AH=0E escribe un carácter pasando por el manejador de F000:1300', () => {
+    const s = session();
+    s.type('a', 'mov ax,e41', 'int 10', 'int 20', '');
+    expect(s.type('g')).toEqual(['A', 'Program terminated normally']);
   });
 });
 
