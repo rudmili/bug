@@ -37,9 +37,21 @@ describe('registro de comandos', () => {
     expect(useCommandLog.getState()).toMatchObject({ log: ['a', 'nop', '', 'r'], history: ['a', 'nop', 'r'] });
   });
 
+  it('migra lo guardado por la versión 2, que no tenía reloj', async () => {
+    localStorage.setItem('debug8086-commands', JSON.stringify({ state: { log: ['r'], history: ['r'] }, version: 2 }));
+    await useCommandLog.persist.rehydrate();
+    expect(useCommandLog.getState()).toMatchObject({ log: ['r'], history: ['r'], clock: null });
+  });
+
+  it('load trae la hora de arranque del programa', () => {
+    useCommandLog.getState().load({ lines: ['r'], clock: '2026-10-22T23:18:45.32' });
+    expect(useCommandLog.getState()).toMatchObject({ log: ['r'], clock: '2026-10-22T23:18:45.32' });
+  });
+
   it('clear borra todo', () => {
     useCommandLog.getState().append('r');
+    useCommandLog.getState().setClock('2026-10-22T23:18:45.32');
     useCommandLog.getState().clear();
-    expect(useCommandLog.getState()).toMatchObject({ log: [], history: [] });
+    expect(useCommandLog.getState()).toMatchObject({ log: [], history: [], clock: null });
   });
 });

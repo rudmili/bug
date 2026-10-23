@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { linesFromText } from './share';
+import { programFromText } from './share';
+import type { Program } from './share';
 
 interface ToolsProps {
   /** Hay algo para compartir o guardar: líneas desde el último `q`. */
@@ -11,7 +12,7 @@ interface ToolsProps {
   status: string;
   onShare: () => void;
   onSave: () => void;
-  onOpen: (lines: string[]) => void;
+  onOpen: (program: Program) => void;
   onReset: () => void;
 }
 
@@ -35,7 +36,7 @@ export function Tools({ hasProgram, canReset, status, onShare, onSave, onOpen, o
     const file = event.target.files?.[0];
     // Vaciar el campo permite volver a elegir el mismo archivo
     event.target.value = '';
-    if (file) onOpen(linesFromText(await file.text()));
+    if (file) onOpen(programFromText(await file.text()));
   }
 
   return (

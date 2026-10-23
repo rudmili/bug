@@ -4,8 +4,8 @@ import type { DebugSession, DebugView, MemoryTarget, MemoryWindowName } from '..
 
 /** Lo que la interfaz le pide a la sesión. Asíncrono: la sesión puede correr en otro hilo. */
 export interface SessionClient {
-  /** Sesión nueva con las líneas guardadas ya ejecutadas. */
-  start(lines: string[]): Promise<DebugView>;
+  /** Sesión nueva con las líneas guardadas ya ejecutadas, desde la hora de arranque guardada (DebugView.clock). */
+  start(lines: string[], clock?: string | null): Promise<DebugView>;
   submit(line: string): Promise<DebugView>;
   reset(): Promise<DebugView>;
   /** Mueve una ventana de memoria; null si la dirección no es válida. */
@@ -29,7 +29,7 @@ function clientFor(send: (request: SessionRequest) => void) {
   // Solo `window` puede responder null (dirección no válida)
   const view = (request: Request) => call(request) as Promise<DebugView>;
   const client: SessionClient = {
-    start: (lines) => view({ type: 'start', lines }),
+    start: (lines, clock) => view({ type: 'start', lines, clock: clock ?? undefined }),
     submit: (line) => view({ type: 'submit', line }),
     reset: () => view({ type: 'reset' }),
     moveWindow: (window, to) => call({ type: 'window', window, to }),
@@ -60,7 +60,7 @@ export function createWorkerClient(): SessionClient {
  * La sesión en el mismo hilo, con la misma interfaz. Para los tests y para ver el diseño:
  *   createLocalClient(createMockSession)   (mock.ts)
  */
-export function createLocalClient(createSession: () => DebugSession): SessionClient {
+export function createLocalClient(createSession: (clock?: string) => DebugSession): SessionClient {
   const host = createSessionHost(createSession);
   const { client, receive } = clientFor((request) => {
     // Asíncrono como el worker, para que la interfaz se comporte igual con los dos

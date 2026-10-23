@@ -7,7 +7,8 @@ import type { DebugView } from '../debug/types';
 import { App } from './App';
 import { createLocalClient } from './client';
 import type { SessionClient } from './client';
-import { sharedLines } from './share';
+import { sharedProgram } from './share';
+import type { Program } from './share';
 import { useCommandLog } from './store';
 
 // jsdom no implementa los diálogos modales: lo justo para <dialog> con <form method="dialog"> y Escape
@@ -32,7 +33,7 @@ beforeAll(() => {
 });
 
 /** Monta la aplicación y espera a que la sesión arranque (vuelve a ejecutar lo guardado). */
-async function setup(client: SessionClient = createLocalClient(createDebugSession), shared: string[] | null = null) {
+async function setup(client: SessionClient = createLocalClient(createDebugSession), shared: Program | null = null) {
   const user = userEvent.setup();
   const utils = render(<App client={client} shared={shared} />);
   await screen.findByLabelText('Comando de DEBUG');
@@ -201,7 +202,7 @@ describe('App', () => {
 });
 
 describe('App: compartir, guardar y abrir', () => {
-  it('Compartir copia un enlace con las líneas desde el último q', async () => {
+  it('Compartir copia un enlace con las líneas desde el último q y la hora en que arrancó esa máquina', async () => {
     // userEvent.setup() reemplaza navigator.clipboard por un portapapeles de prueba
     const { user, type } = await setup();
     const share = screen.getByRole('button', { name: 'Compartir' });
@@ -210,11 +211,13 @@ describe('App: compartir, guardar y abrir', () => {
     await type('r ax', '1234', 'q', 'r bx', '5');
     await user.click(share);
     const url = new URL(await navigator.clipboard.readText());
-    expect(sharedLines(url.hash)).toEqual(['r bx', '5']);
+    const { clock } = useCommandLog.getState();
+    expect(clock).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d$/);
+    expect(sharedProgram(url.hash)).toEqual({ lines: ['r bx', '5'], clock });
     expect(screen.getByText('Enlace copiado').getAttribute('role')).toBe('status');
   });
 
-  it('Guardar descarga las líneas como texto', async () => {
+  it('Guardar descarga la hora de arranque y las líneas como texto', async () => {
     let saved: Blob | undefined;
     URL.createObjectURL = vi.fn((blob: Blob) => {
       saved = blob;
@@ -226,7 +229,7 @@ describe('App: compartir, guardar y abrir', () => {
     await type('a', 'nop', '');
     await user.click(screen.getByRole('button', { name: 'Guardar' }));
     expect(click).toHaveBeenCalledOnce();
-    expect(await saved!.text()).toBe('a\nnop\n\n');
+    expect(await saved!.text()).toBe(`@reloj ${useCommandLog.getState().clock}\na\nnop\n\n`);
   });
 
   it('Abrir carga un archivo directamente si no hay sesión', async () => {
@@ -237,6 +240,15 @@ describe('App: compartir, guardar y abrir', () => {
     await screen.findByText('-r ax');
     expect(register('AX')).toBe('1234');
     expect(useCommandLog.getState().log).toEqual(['r ax', '1234']);
+  });
+
+  it('Abrir un archivo con hora de arranque repite el programa desde esa hora', async () => {
+    const { user, register } = await setup();
+    const file = new File(['@reloj 2026-10-22T23:18:45.32\na\nmov ah,2c\nint 21\nint 3\n\ng\n'], 'programa.txt');
+    await user.upload(document.querySelector<HTMLInputElement>('input[type=file]')!, file);
+    await screen.findByText('-g');
+    expect(useCommandLog.getState().clock).toBe('2026-10-22T23:18:45.32');
+    expect([register('CX'), register('DX')]).toEqual(['1712', '2D1D']);
   });
 
   it('Abrir pregunta antes de reemplazar una sesión', async () => {
@@ -251,8 +263,8 @@ describe('App: compartir, guardar y abrir', () => {
   });
 
   it('un programa compartido con una sesión guardada espera confirmación', async () => {
-    useCommandLog.getState().load(['r bx', '5']);
-    const { user, register } = await setup(undefined, ['r ax', '1234']);
+    useCommandLog.getState().load({ lines: ['r bx', '5'], clock: null });
+    const { user, register } = await setup(undefined, { lines: ['r ax', '1234'], clock: null });
     expect(register('BX')).toBe('0005');
     const dialog = await screen.findByRole('dialog', { name: '¿Abrir el programa compartido?' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));

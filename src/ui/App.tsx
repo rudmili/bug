@@ -9,10 +9,11 @@ import { StatePanel } from './StatePanel';
 import { AppInfo } from './AppInfo';
 import { Tools } from './Tools';
 import { sessionText, shareUrl } from './share';
+import type { Program } from './share';
 import { useCommandLog } from './store';
 
 /** Lo que espera confirmación porque borra la sesión actual. */
-type Pending = { kind: 'reset' } | { kind: 'load'; lines: string[]; from: 'link' | 'file' };
+type Pending = { kind: 'reset' } | { kind: 'load'; program: Program; from: 'link' | 'file' };
 
 /** Textos del diálogo según qué se confirma. */
 const CONFIRM: Record<'reset' | 'link' | 'file', { title: string; detail: string; confirmLabel: string }> = {
@@ -33,6 +34,12 @@ const CONFIRM: Record<'reset' | 'link' | 'file', { title: string; detail: string
   },
 };
 
+/** La hora de arranque se guarda con los comandos: la sesión la elige al empezar y la cambia tras `q`. */
+function saveClock(view: DebugView) {
+  const store = useCommandLog.getState();
+  if (view.clock !== store.clock) store.setClock(view.clock);
+}
+
 /** Cuánto se ve el aviso de "Enlace copiado". */
 const STATUS_MS = 2500;
 
@@ -44,7 +51,7 @@ interface AppProps {
    */
   client: SessionClient;
   /** Programa recibido en un enlace (#p=…) que espera confirmación porque ya había una sesión guardada. */
-  shared?: string[] | null;
+  shared?: Program | null;
 }
 
 export function App({ client, shared = null }: AppProps) {
@@ -66,11 +73,13 @@ export function App({ client, shared = null }: AppProps) {
   // En StrictMode corre dos veces; la segunda crea otra sesión igual y es la que queda.
   useEffect(() => {
     let current = true;
-    client.start(useCommandLog.getState().log).then(
+    const { log, clock } = useCommandLog.getState();
+    client.start(log, clock).then(
       (next) => {
         if (!current) return;
+        saveClock(next);
         setView(next);
-        if (shared) setPending({ kind: 'load', lines: shared, from: 'link' });
+        if (shared) setPending({ kind: 'load', program: shared, from: 'link' });
       },
       (error: unknown) => current && setFailure(error),
     );
@@ -79,11 +88,16 @@ export function App({ client, shared = null }: AppProps) {
     };
   }, [client, shared]);
 
+  function show(next: DebugView) {
+    saveClock(next);
+    setView(next);
+  }
+
   function run(task: () => Promise<DebugView>) {
     setRunning((n) => n + 1);
     queue.current = queue.current
       .then(task)
-      .then(setView, setFailure)
+      .then(show, setFailure)
       .finally(() => setRunning((n) => n - 1));
   }
 
@@ -111,9 +125,9 @@ export function App({ client, shared = null }: AppProps) {
     }
   }
 
-  function load(lines: string[]) {
-    useCommandLog.getState().load(lines);
-    run(() => client.start(lines));
+  function load(program: Program) {
+    useCommandLog.getState().load(program);
+    run(() => client.start(program.lines, program.clock));
   }
 
   function confirm(confirmed: boolean) {
@@ -124,7 +138,7 @@ export function App({ client, shared = null }: AppProps) {
       useCommandLog.getState().clear();
       run(() => client.reset());
     } else {
-      load(action.lines);
+      load(action.program);
     }
   }
 
@@ -134,7 +148,8 @@ export function App({ client, shared = null }: AppProps) {
   }
 
   async function share() {
-    const url = shareUrl(`${location.origin}${location.pathname}`, useCommandLog.getState().log);
+    const { log, clock } = useCommandLog.getState();
+    const url = shareUrl(`${location.origin}${location.pathname}`, { lines: log, clock });
     try {
       // En el móvil, el menú de compartir del sistema; en el escritorio, al portapapeles
       if (navigator.share) {
@@ -150,7 +165,8 @@ export function App({ client, shared = null }: AppProps) {
   }
 
   function save() {
-    const blob = new Blob([sessionText(useCommandLog.getState().log)], { type: 'text/plain' });
+    const { log, clock } = useCommandLog.getState();
+    const blob = new Blob([sessionText({ lines: log, clock })], { type: 'text/plain' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = 'debug-8086.txt';
@@ -158,9 +174,9 @@ export function App({ client, shared = null }: AppProps) {
     URL.revokeObjectURL(link.href);
   }
 
-  function open(lines: string[]) {
-    if (useCommandLog.getState().log.length === 0) load(lines);
-    else setPending({ kind: 'load', lines, from: 'file' });
+  function open(program: Program) {
+    if (useCommandLog.getState().log.length === 0) load(program);
+    else setPending({ kind: 'load', program, from: 'file' });
   }
 
   // El primer arranque tarda lo que el worker en cargar: la página queda con el fondo de la terminal

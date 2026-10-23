@@ -10,7 +10,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './ui/App'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { createWorkerClient } from './ui/client'
-import { sharedLines } from './ui/share'
+import { sharedProgram } from './ui/share'
 import { useCommandLog } from './ui/store'
 
 // Modo sin conexión: sw.js solo existe en el build (vite.config.ts)
@@ -27,7 +27,7 @@ const client = createWorkerClient()
 
 // Programa compartido en el enlace (#p=…): sin nada guardado se abre directamente; si hay una sesión,
 // App pregunta antes de reemplazarla. El hash se quita para que recargar no lo vuelva a abrir.
-const shared = sharedLines(location.hash)
+const shared = sharedProgram(location.hash)
 if (shared) history.replaceState(null, '', location.pathname + location.search)
 const store = useCommandLog.getState()
 const pendingShared = shared && store.log.length > 0 ? shared : null
