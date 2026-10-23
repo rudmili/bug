@@ -126,29 +126,33 @@ function parseAddress(m: Machine, token: Token, defaultSeg: number): Address {
   return { seg, off: hexValue({ text: token.text.slice(colon + 1), col: token.col + colon + 1 }) };
 }
 
-/** Rango: "inicio", "inicio fin" o "inicio L longitud". Devuelve el desplazamiento final incluido. */
-function parseRange(m: Machine, tokens: Token[], defaultSeg: number, defaultLength: number): { start: Address; end: number } {
+/** Rango al principio de los argumentos: "inicio fin" o "inicio L longitud". Devuelve el desplazamiento final incluido y cuántos tokens usó. */
+function leadingRange(m: Machine, tokens: Token[], defaultSeg: number, missingCol: number): { start: Address; end: number; used: number } {
+  if (!tokens[0]) throw new CommandError(missingCol);
   const start = parseAddress(m, tokens[0], defaultSeg);
-  if (tokens.length === 1) return { start, end: Math.min(start.off + defaultLength - 1, 0xffff) };
-  let lengthToken: Token | null = null;
-  let endToken: Token | null = null;
-  if (/^l/i.test(tokens[1].text)) {
-    const rest = tokens[1].text.slice(1);
-    lengthToken = rest !== '' ? { text: rest, col: tokens[1].col + 1 } : (tokens[2] ?? null);
-    if (lengthToken === null) throw new CommandError(tokens[1].col + 1);
-    const used = rest !== '' ? 2 : 3;
-    if (tokens.length > used) throw new CommandError(tokens[used].col);
-  } else {
-    endToken = tokens[1];
-    if (tokens.length > 2) throw new CommandError(tokens[2].col);
-  }
-  if (lengthToken) {
+  const second = tokens[1];
+  if (!second) throw new CommandError(tokens[0].col + tokens[0].text.length);
+  if (/^l/i.test(second.text)) {
+    const rest = second.text.slice(1);
+    const lengthToken = rest !== '' ? { text: rest, col: second.col + 1 } : tokens[2];
+    if (!lengthToken) throw new CommandError(second.col + 1);
     const length = hexValue(lengthToken);
     if (length === 0 || start.off + length - 1 > 0xffff) throw new CommandError(lengthToken.col);
-    return { start, end: start.off + length - 1 };
+    return { start, end: start.off + length - 1, used: rest !== '' ? 2 : 3 };
   }
-  const end = hexValue(endToken!);
-  if (end < start.off) throw new CommandError(endToken!.col);
+  const end = hexValue(second);
+  if (end < start.off) throw new CommandError(second.col);
+  return { start, end, used: 2 };
+}
+
+/** Rango de `u` y `d`: "inicio", "inicio fin" o "inicio L longitud". Devuelve el desplazamiento final incluido. */
+function parseRange(m: Machine, tokens: Token[], defaultSeg: number, defaultLength: number): { start: Address; end: number } {
+  if (tokens.length === 1) {
+    const start = parseAddress(m, tokens[0], defaultSeg);
+    return { start, end: Math.min(start.off + defaultLength - 1, 0xffff) };
+  }
+  const { start, end, used } = leadingRange(m, tokens, defaultSeg, 0);
+  if (tokens.length > used) throw new CommandError(tokens[used].col);
   return { start, end };
 }
 
@@ -269,7 +273,37 @@ function takeStart(m: Machine, tokens: Token[]): Token[] {
   return tokens.slice(2);
 }
 
-function trace(m: Machine, tokens: Token[]): OutLine[] {
+/** Instrucciones que `p` ejecuta enteras: sigue hasta que la ejecución vuelve a la instrucción siguiente. */
+const PROCEED = new Set(['CALL', 'CALL FAR', 'LOOP', 'LOOPZ', 'LOOPNZ']);
+
+/** La instrucción en CS:IP sin sus prefijos, y cuántos bytes ocupa con ellos. */
+function instructionAt(m: Machine): { instr: Instr; length: number } {
+  let length = 0;
+  for (let i = 0; i < 16; i++) {
+    const instr = decode(m, m.sregs[CS], (m.ip + length) & 0xffff);
+    length += instr.length;
+    if (!instr.prefix) return { instr, length };
+  }
+  return { instr: decode(m, m.sregs[CS], m.ip), length };
+}
+
+/** Un paso de `p`: como `t`, salvo que una llamada o un LOOP se ejecutan hasta volver a la siguiente instrucción. */
+function proceedOne(m: Machine, output: Output, lines: OutLine[]): RunEnd {
+  const { instr, length } = instructionAt(m);
+  if (!PROCEED.has(instr.mnem)) return runOne(m, output, lines).end;
+  const seg = m.sregs[CS];
+  const back = (m.ip + length) & 0xffff;
+  for (let i = 0; i < MAX_STEPS; i++) {
+    const { end, brk } = runOne(m, output, lines);
+    if (end !== 'step' || brk) return end;
+    if (m.sregs[CS] === seg && m.ip === back) return 'step';
+  }
+  output.writeLine(`Ejecución detenida tras ${MAX_STEPS.toLocaleString('es')} instrucciones`);
+  return 'step';
+}
+
+/** `t` y `p`: ejecutan `cantidad` pasos y muestran los registros después de cada uno. */
+function trace(m: Machine, tokens: Token[], proceed = false): OutLine[] {
   const rest = takeStart(m, tokens);
   if (rest.length > 1) throw new CommandError(rest[1].col);
   const count = rest[0] ? hexValue(rest[0]) : 1;
@@ -277,7 +311,7 @@ function trace(m: Machine, tokens: Token[]): OutLine[] {
   const lines: OutLine[] = [];
   const output = new Output();
   for (let i = 0; i < count; i++) {
-    const { end } = runOne(m, output, lines);
+    const end = proceed ? proceedOne(m, output, lines) : runOne(m, output, lines).end;
     drain(output, lines);
     if (end === 'terminated' || end === 'stopped') break;
     lines.push(...registerDump(m).map(out));
@@ -345,6 +379,71 @@ function dump(m: Machine, state: CommandState, tokens: Token[]): { lines: OutLin
   }
   state.dumpAddr = { seg: start.seg, off: (end + 1) & 0xffff };
   return { lines, focus: start.off };
+}
+
+// ---------------------------------------------------------------- Memoria y aritmética
+
+/** Rango y lista de bytes de `f` y `s`: "f 200 l 10 41 42", "s 100 1ff 'Hola'". */
+function rangeAndList(m: Machine, line: string, tokens: Token[], missingCol: number): { start: Address; end: number; bytes: number[] } {
+  const { start, end, used } = leadingRange(m, tokens, DS, missingCol);
+  const listToken = tokens[used];
+  if (!listToken) throw new CommandError(line.length);
+  return { start, end, bytes: parseByteList(line.slice(listToken.col), listToken.col) };
+}
+
+/** Rango y dirección de destino de `m` y `c`. */
+function rangeAndAddress(m: Machine, line: string, tokens: Token[], missingCol: number): { start: Address; end: number; dest: Address } {
+  const { start, end, used } = leadingRange(m, tokens, DS, missingCol);
+  const destToken = tokens[used];
+  if (!destToken) throw new CommandError(line.length);
+  if (tokens.length > used + 1) throw new CommandError(tokens[used + 1].col);
+  return { start, end, dest: parseAddress(m, destToken, DS) };
+}
+
+/** `f`: llena el rango repitiendo la lista. */
+function fill(m: Machine, line: string, tokens: Token[], missingCol: number): RunResult {
+  const { start, end, bytes } = rangeAndList(m, line, tokens, missingCol);
+  for (let off = start.off, i = 0; off <= end; off++, i++) writeByte(m, start.seg, off, bytes[i % bytes.length], 'edit');
+  return { output: [], dataFocus: start.off };
+}
+
+/** `m`: copia el rango al destino. Lee todo antes de escribir, así un destino que se superpone sale bien. */
+function move(m: Machine, line: string, tokens: Token[], missingCol: number): RunResult {
+  const { start, end, dest } = rangeAndAddress(m, line, tokens, missingCol);
+  const bytes = Array.from({ length: end - start.off + 1 }, (_, i) => readByte(m, start.seg, start.off + i));
+  bytes.forEach((b, i) => writeByte(m, dest.seg, dest.off + i, b, 'edit'));
+  return { output: [], dataFocus: dest.off };
+}
+
+/** `c`: una línea por cada byte distinto, "073F:0100  41  42  073F:0200". */
+function compare(m: Machine, line: string, tokens: Token[], missingCol: number): OutLine[] {
+  const { start, end, dest } = rangeAndAddress(m, line, tokens, missingCol);
+  const at = (seg: number, off: number) => `${hex4(seg)}:${hex4(off & 0xffff)}`;
+  const lines: OutLine[] = [];
+  for (let i = 0; i <= end - start.off; i++) {
+    const a = readByte(m, start.seg, start.off + i);
+    const b = readByte(m, dest.seg, dest.off + i);
+    if (a !== b) lines.push(out(`${at(start.seg, start.off + i)}  ${hex2(a)}  ${hex2(b)}  ${at(dest.seg, dest.off + i)}`));
+  }
+  return lines;
+}
+
+/** `s`: la dirección de cada aparición de la lista que entra entera en el rango. */
+function search(m: Machine, line: string, tokens: Token[], missingCol: number): OutLine[] {
+  const { start, end, bytes } = rangeAndList(m, line, tokens, missingCol);
+  const lines: OutLine[] = [];
+  for (let off = start.off; off + bytes.length - 1 <= end; off++) {
+    if (bytes.every((b, i) => readByte(m, start.seg, off + i) === b)) lines.push(out(`${hex4(start.seg)}:${hex4(off)}`));
+  }
+  return lines;
+}
+
+/** `h`: suma y resta de dos números de 16 bits, "0008  0002". */
+function hexArith(tokens: Token[], missingCol: number): OutLine[] {
+  if (tokens.length < 2) throw new CommandError(tokens[0] ? tokens[0].col + tokens[0].text.length : missingCol);
+  if (tokens.length > 2) throw new CommandError(tokens[2].col);
+  const [a, b] = tokens.map((t) => hexValue(t));
+  return [out(`${hex4((a + b) & 0xffff)}  ${hex4((a - b) & 0xffff)}`)];
 }
 
 // ---------------------------------------------------------------- Modos
@@ -460,6 +559,18 @@ function runCommand(m: Machine, state: CommandState, line: string): RunResult {
       bytes.forEach((b, i) => writeByte(m, addr.seg, addr.off + i, b, 'edit'));
       return { output: [], dataFocus: addr.off };
     }
+    case 'p':
+      return { output: trace(m, tokens, true) };
+    case 'h':
+      return { output: hexArith(tokens, argsCol + argsText.length) };
+    case 'f':
+      return fill(m, line, tokens, argsCol + argsText.length);
+    case 'm':
+      return move(m, line, tokens, argsCol + argsText.length);
+    case 'c':
+      return { output: compare(m, line, tokens, argsCol + argsText.length) };
+    case 's':
+      return { output: search(m, line, tokens, argsCol + argsText.length) };
     case 'q':
       if (tokens.length > 0) throw new CommandError(tokens[0].col);
       return { output: [], reset: true };

@@ -65,6 +65,21 @@ const PAGES: Record<string, ManPage> = {
       't =100        ejecuta desde CS:0100',
     ],
   },
+  p: {
+    name: 'p - ejecuta paso a paso sin entrar en llamadas (proceed)',
+    synopsis: ['p [=dirección] [cantidad]'],
+    description: [
+      'Como `t`, pero una llamada (CALL) o un bucle (LOOP, LOOPZ, LOOPNZ) se',
+      'ejecutan enteros: se detiene recién en la instrucción que sigue. Sirve',
+      'para no recorrer paso a paso una subrutina que ya funciona.',
+      '',
+      'Con =dirección, primero mueve CS:IP a esa dirección.',
+    ],
+    examples: [
+      'p             un paso; un CALL se ejecuta entero',
+      'p 3           tres pasos',
+    ],
+  },
   g: {
     name: 'g - ejecuta hasta el final (go)',
     synopsis: ['g [=dirección] [punto de parada ...]'],
@@ -134,6 +149,62 @@ const PAGES: Record<string, ManPage> = {
       'e 200 "Hola$"        escribe el texto',
       'e 200                edita byte a byte',
     ],
+  },
+  f: {
+    name: 'f - llena la memoria (fill)',
+    synopsis: ['f dirección fin lista', 'f dirección L longitud lista'],
+    description: [
+      'Escribe la lista en el rango, repitiéndola hasta llenarlo. La lista admite',
+      'bytes en hexadecimal y texto entre comillas. El segmento por defecto es DS.',
+    ],
+    examples: [
+      'f 200 l 10 0     pone en cero 16 bytes desde DS:0200',
+      'f 200 20f "ab"   escribe abab... de DS:0200 a DS:020F',
+    ],
+  },
+  m: {
+    name: 'm - copia memoria (move)',
+    synopsis: ['m dirección fin destino', 'm dirección L longitud destino'],
+    description: [
+      'Copia los bytes del rango a partir del destino. Funciona aunque el origen',
+      'y el destino se superpongan. El segmento por defecto es DS.',
+    ],
+    examples: [
+      'm 200 20f 300    copia DS:0200-020F a DS:0300',
+      'm 200 l 4 cs:0   copia 4 bytes a CS:0000',
+    ],
+  },
+  c: {
+    name: 'c - compara memoria (compare)',
+    synopsis: ['c dirección fin destino', 'c dirección L longitud destino'],
+    description: [
+      'Compara el rango con los bytes a partir del destino y muestra una línea por',
+      'cada diferencia: dirección y byte del rango, byte y dirección del destino.',
+      'Si son iguales no muestra nada. El segmento por defecto es DS.',
+    ],
+    examples: ['c 200 l 10 300   compara 16 bytes de DS:0200 con DS:0300'],
+  },
+  s: {
+    name: 's - busca en la memoria (search)',
+    synopsis: ['s dirección fin lista', 's dirección L longitud lista'],
+    description: [
+      'Busca la lista de bytes en el rango y muestra la dirección de cada lugar',
+      'donde aparece entera. La lista admite bytes en hexadecimal y texto entre',
+      'comillas. El segmento por defecto es DS.',
+    ],
+    examples: [
+      's 100 l 100 cd 21     busca INT 21 en el programa',
+      's 200 2ff "Hola"      busca un texto',
+    ],
+  },
+  h: {
+    name: 'h - suma y resta en hexadecimal (hex)',
+    synopsis: ['h valor1 valor2'],
+    description: [
+      'Muestra la suma y la diferencia de los dos valores, en 16 bits. Sirve para',
+      'calcular direcciones y longitudes sin salir de DEBUG.',
+    ],
+    examples: ['h 130 102      muestra 0232  002E'],
   },
   q: {
     name: 'q - reinicia la máquina (quit)',

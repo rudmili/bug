@@ -228,6 +228,92 @@ describe('commands: t y g', () => {
   });
 });
 
+describe('commands: h, f, m, c y s', () => {
+  const bytesAt = (m: Machine, off: number, n: number) =>
+    Array.from({ length: n }, (_, i) => readByte(m, 0x073f, off + i));
+
+  it('h muestra la suma y la resta en 16 bits', () => {
+    expect(session().type('h 5 3')).toEqual(['0008  0002']);
+    expect(session().type('h 3 5')).toEqual(['0008  FFFE']);
+    expect(session().type('h ffff 1')).toEqual(['0000  FFFE']);
+    expect(session().type('h 5')).toEqual(['    ^ Error']);
+    expect(session().type('h 1 2 3')).toEqual(['       ^ Error']);
+  });
+
+  it('f llena un rango repitiendo la lista', () => {
+    const s = session();
+    s.type('f 200 l 7 41 "BC"');
+    expect(bytesAt(s.m, 0x200, 8)).toEqual([0x41, 0x42, 0x43, 0x41, 0x42, 0x43, 0x41, 0]);
+    s.type('f 300 303 ff');
+    expect(bytesAt(s.m, 0x300, 5)).toEqual([0xff, 0xff, 0xff, 0xff, 0]);
+    expect(run(s.m, s.state, 'f 400 l 2 1').dataFocus).toBe(0x400);
+  });
+
+  it('f sin rango completo o sin lista es error', () => {
+    expect(session().type('f')).toEqual(['  ^ Error']);
+    expect(session().type('f 200')).toEqual(['      ^ Error']);
+    expect(session().type('f 200 l 4')).toEqual(['          ^ Error']);
+  });
+
+  it('m copia, también si origen y destino se superponen', () => {
+    const s = session();
+    s.type('e 200 1 2 3 4', 'm 200 203 300');
+    expect(bytesAt(s.m, 0x300, 4)).toEqual([1, 2, 3, 4]);
+    s.type('m 200 l 4 201');
+    expect(bytesAt(s.m, 0x200, 5)).toEqual([1, 1, 2, 3, 4]);
+    expect(run(s.m, s.state, 'm 200 l 1 500').dataFocus).toBe(0x500);
+  });
+
+  it('c muestra cada byte distinto con las dos direcciones', () => {
+    const s = session();
+    s.type('e 200 "HOLA"', 'e 300 "HELA"');
+    expect(s.type('c 200 l 4 300')).toEqual(['073F:0201  4F  45  073F:0301']);
+    expect(s.type('c 200 203 300 x')).toEqual(['               ^ Error']);
+  });
+
+  it('s busca la lista y muestra cada aparición', () => {
+    const s = session();
+    s.type('e 200 "abcabc"');
+    expect(s.type('s 200 l 6 "bc"')).toEqual(['073F:0201', '073F:0204']);
+    expect(s.type('s 200 l 5 "bc"')).toEqual(['073F:0201']);
+    expect(s.type('s 200 l 6 7a')).toEqual([]);
+  });
+});
+
+describe('commands: p', () => {
+  it('ejecuta una llamada entera y se detiene en la instrucción siguiente', () => {
+    const s = session();
+    s.type('a 100', 'call 200', 'nop', '', 'a 200', 'mov ax,1', 'mov bx,2', 'ret', '');
+    const lines = s.type('p');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toMatch(/^AX=0001 {2}BX=0002/);
+    expect(hex(s.m.ip)).toBe('0103');
+    expect(hex(s.m.regs[SP])).toBe('00FD');
+  });
+
+  it('ejecuta un LOOP hasta que termina', () => {
+    const s = session();
+    s.type('a 100', 'mov cx,5', 'inc ax', 'loop 103', 'nop', '');
+    s.type('p 2');
+    expect(hex(s.m.ip)).toBe('0104');
+    s.type('p');
+    expect([hex(s.m.ip), s.m.regs[CX], s.m.regs[AX]]).toEqual(['0106', 0, 5]);
+  });
+
+  it('en el resto de las instrucciones es igual a t', () => {
+    const a = session();
+    const b = session();
+    for (const s of [a, b]) s.type('a 100', 'mov ax,1', 'add ax,2', '');
+    expect(a.type('p 2')).toEqual(b.type('t 2'));
+  });
+
+  it('se detiene si el programa termina dentro de la llamada', () => {
+    const s = session();
+    s.type('a 100', 'call 200', '', 'a 200', 'int 20', '');
+    expect(s.type('p')).toEqual(['Program terminated normally']);
+  });
+});
+
 describe('commands: otros', () => {
   it('comando desconocido es error bajo la letra', () => {
     expect(session().type('x')).toEqual([' ^ Error']);
@@ -287,7 +373,7 @@ describe('commands: man', () => {
     for (const l of all) expect(l.length).toBeLessThanOrEqual(77);
   });
 
-  it('una m sola sigue siendo un error', () => {
-    expect(session().type('m')).toEqual([' ^ Error']);
+  it('una m sola es el comando m sin rango, no man', () => {
+    expect(session().type('m')).toEqual(['  ^ Error']);
   });
 });
