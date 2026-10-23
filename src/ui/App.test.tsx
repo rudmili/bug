@@ -7,6 +7,7 @@ import type { DebugView } from '../debug/types';
 import { App } from './App';
 import { createLocalClient } from './client';
 import type { SessionClient } from './client';
+import { sharedLines } from './share';
 import { useCommandLog } from './store';
 
 // jsdom no implementa los diálogos modales: lo justo para <dialog> con <form method="dialog"> y Escape
@@ -31,9 +32,9 @@ beforeAll(() => {
 });
 
 /** Monta la aplicación y espera a que la sesión arranque (vuelve a ejecutar lo guardado). */
-async function setup(client: SessionClient = createLocalClient(createDebugSession)) {
+async function setup(client: SessionClient = createLocalClient(createDebugSession), shared: string[] | null = null) {
   const user = userEvent.setup();
-  const utils = render(<App client={client} />);
+  const utils = render(<App client={client} shared={shared} />);
   await screen.findByLabelText('Comando de DEBUG');
   const input = () => screen.getByLabelText<HTMLInputElement>('Comando de DEBUG');
   const output = () => screen.getByLabelText('Salida de DEBUG');
@@ -196,5 +197,66 @@ describe('App', () => {
     const { type } = await setup();
     await type('r ax');
     expect(document.querySelector('[aria-live]')?.textContent).toBe('AX 0000');
+  });
+});
+
+describe('App: compartir, guardar y abrir', () => {
+  it('Compartir copia un enlace con las líneas desde el último q', async () => {
+    // userEvent.setup() reemplaza navigator.clipboard por un portapapeles de prueba
+    const { user, type } = await setup();
+    const share = screen.getByRole('button', { name: 'Compartir' });
+    expect(share).toHaveProperty('disabled', true);
+
+    await type('r ax', '1234', 'q', 'r bx', '5');
+    await user.click(share);
+    const url = new URL(await navigator.clipboard.readText());
+    expect(sharedLines(url.hash)).toEqual(['r bx', '5']);
+    expect(screen.getByRole('status').textContent).toBe('Enlace copiado');
+  });
+
+  it('Guardar descarga las líneas como texto', async () => {
+    let saved: Blob | undefined;
+    URL.createObjectURL = vi.fn((blob: Blob) => {
+      saved = blob;
+      return 'blob:sesion';
+    });
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const { user, type } = await setup();
+    await type('a', 'nop', '');
+    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(click).toHaveBeenCalledOnce();
+    expect(await saved!.text()).toBe('a\nnop\n\n');
+  });
+
+  it('Abrir carga un archivo directamente si no hay sesión', async () => {
+    const { user, register } = await setup();
+    // Con saltos de Windows, como lo guardaría el Bloc de notas
+    const file = new File(['r ax\r\n1234\r\n'], 'programa.txt', { type: 'text/plain' });
+    await user.upload(document.querySelector<HTMLInputElement>('input[type=file]')!, file);
+    await screen.findByText('-r ax');
+    expect(register('AX')).toBe('1234');
+    expect(useCommandLog.getState().log).toEqual(['r ax', '1234']);
+  });
+
+  it('Abrir pregunta antes de reemplazar una sesión', async () => {
+    const { user, type, register } = await setup();
+    await type('r bx', '5');
+    const file = new File(['r ax\n1234\n'], 'programa.txt');
+    await user.upload(document.querySelector<HTMLInputElement>('input[type=file]')!, file);
+    const dialog = await screen.findByRole('dialog', { name: '¿Abrir el archivo?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Abrir' }));
+    await screen.findByText('-r ax');
+    expect([register('AX'), register('BX')]).toEqual(['1234', '0000']);
+  });
+
+  it('un programa compartido con una sesión guardada espera confirmación', async () => {
+    useCommandLog.getState().load(['r bx', '5']);
+    const { user, register } = await setup(undefined, ['r ax', '1234']);
+    expect(register('BX')).toBe('0005');
+    const dialog = await screen.findByRole('dialog', { name: '¿Abrir el programa compartido?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(register('BX')).toBe('0005');
+    expect(useCommandLog.getState().log).toEqual(['r bx', '5']);
   });
 });

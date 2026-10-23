@@ -456,21 +456,28 @@ body {
   .info--float { top: var(--panel-inset); right: calc(var(--panel-width) + var(--panel-inset) * 2); }
 }
 
-/* ============================== BOTÓN REINICIAR ============================== */
-/* Flota abajo a la derecha de la salida, justo encima de la línea de comandos */
+/* ============================== HERRAMIENTAS ============================== */
+/* Compartir, Guardar, Abrir y Reiniciar: flotan abajo a la derecha de la salida, justo encima de la línea de comandos */
 .term { position: relative; }
-/* Hueco bajo la última línea para que el botón no la tape (las líneas de `d` ocupan todo el ancho en móvil) */
+/* Hueco bajo la última línea para que los botones no la tapen (las líneas de `d` ocupan todo el ancho en móvil) */
 .term__out::after { content: ''; flex-shrink: 0; height: 44px; }
-.reset {
+.tools {
   position: absolute;
   right: 12px;
   bottom: 52px;
   z-index: 1;
   display: flex;
   align-items: center;
+  gap: 4px;
+}
+.tool {
+  display: flex;
+  align-items: center;
   gap: 6px;
   height: 36px;
-  padding: 0 12px;
+  min-width: 36px;
+  justify-content: center;
+  padding: 0 10px;
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--cell);
@@ -480,24 +487,41 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
-.reset:hover:not(:disabled) { background: var(--tab-on); color: var(--text); }
-.reset:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
-.reset:disabled { opacity: 0.4; cursor: default; }
+.tool:hover:not(:disabled) { background: var(--tab-on); color: var(--text); }
+.tool:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
+.tool:disabled { opacity: 0.4; cursor: default; }
+/* "Enlace copiado": a la izquierda de los botones */
+.tools__status { margin: 0 6px 0 0; font-family: var(--font-ui); font-size: 12px; color: var(--cmd); white-space: nowrap; }
+.tools__status:empty { display: none; }
+.tools__file { display: none; }
+
+/* En móvil solo los íconos: el texto queda como nombre accesible del botón */
+@media (max-width: 767.98px) {
+  .tool { padding: 0; }
+  .tool__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 
 @media (min-width: 768px) {
-  .reset { right: 16px; }
+  .tools { right: 16px; }
 }
 
 @media (min-width: 1024px) {
   /* A la izquierda del panel flotante, como la versión */
-  .reset { right: calc(var(--panel-width) + var(--panel-inset) * 2); bottom: 50px; }
+  .tools { right: calc(var(--panel-width) + var(--panel-inset) * 2); bottom: 50px; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .reset { transition: background-color 120ms ease-out, color 120ms ease-out; }
+  .tool { transition: background-color 120ms ease-out, color 120ms ease-out; }
 }
 
-/* Confirmación de Reiniciar: <dialog> modal sobre un fondo oscurecido */
+/* Confirmaciones (Reiniciar, abrir un programa): <dialog> modal sobre un fondo oscurecido */
 .confirm {
   width: min(360px, calc(100vw - 32px));
   padding: 16px;

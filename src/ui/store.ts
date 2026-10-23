@@ -18,6 +18,8 @@ interface CommandLogState {
   append: (line: string) => void;
   /** `q` dejó la máquina en el estado inicial: lo anterior ya no hace falta para reconstruirla. */
   restart: () => void;
+  /** Un programa compartido o abierto de un archivo reemplaza la sesión; sus líneas se suman a las flechas. */
+  load: (lines: string[]) => void;
   /** Botón "Reiniciar": olvida todo lo escrito. */
   clear: () => void;
 }
@@ -33,6 +35,11 @@ export const useCommandLog = create<CommandLogState>()(
           history: line.trim() === '' ? s.history : [...s.history, line].slice(-MAX_HISTORY),
         })),
       restart: () => set({ log: [] }),
+      load: (lines) =>
+        set((s) => ({
+          log: lines,
+          history: [...s.history, ...lines.filter((line) => line.trim() !== '')].slice(-MAX_HISTORY),
+        })),
       clear: () => set({ log: [], history: [] }),
     }),
     {
