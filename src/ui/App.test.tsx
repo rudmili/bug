@@ -318,3 +318,33 @@ describe('App: navegar la memoria', () => {
     expect(input.getAttribute('aria-invalid')).toBe('false');
   });
 });
+
+describe('App: un programa que lee el teclado', () => {
+  it('cada tecla llega al programa sin Enter, se ve su eco y no va a las flechas', async () => {
+    const { user, input, output, type } = await setup();
+    await type('a', 'mov ah,1', 'int 21', 'mov ah,1', 'int 21', 'int 20', '', 'g');
+    await waitFor(() => expect(input().placeholder).toMatch(/espera una tecla/));
+    expect(screen.getByText('', { selector: 'label' })).toBeTruthy();
+
+    await user.keyboard('o');
+    await waitFor(() => expect(within(output()).getByText('o')).toBeTruthy());
+    expect(input().value).toBe('');
+    await user.keyboard('k');
+    await within(output()).findByText('Program terminated normally');
+    expect(within(output()).getByText('ok')).toBeTruthy();
+
+    expect(useCommandLog.getState().log.slice(-3)).toEqual(['g', 'o', 'k']);
+    expect(useCommandLog.getState().history.at(-1)).toBe('g');
+  });
+
+  it('Enter, las flechas y Ctrl+C se mandan como teclas', async () => {
+    const { user, input, output, type } = await setup();
+    await type('a', 'mov ah,8', 'int 21', 'mov ah,8', 'int 21', 'mov ah,8', 'int 21', 'int 20', '', 'g');
+    await waitFor(() => expect(input().placeholder).toMatch(/espera una tecla/));
+    await user.keyboard('{ArrowUp}');
+    await user.keyboard('{Control>}c{/Control}');
+    await within(output()).findByText('^C');
+    expect(useCommandLog.getState().log.slice(-2)).toEqual(['{Up}', '\x03']);
+    expect(input().placeholder).not.toMatch(/espera una tecla/);
+  });
+});

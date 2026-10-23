@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './tokens.css';
 import './debug-ui.css';
 import type { DebugView, MemoryTarget, MemoryWindowName } from '../debug/types';
@@ -52,8 +52,10 @@ export function App({ client, shared = null }: AppProps) {
   const hasProgram = useCommandLog((s) => s.log.length > 0);
   const empty = useCommandLog((s) => s.log.length === 0 && s.history.length === 0);
   const [view, setView] = useState<DebugView | null>(null);
-  // Un comando a la vez: mientras corre (un `g` largo) la línea queda en solo lectura
-  const [busy, setBusy] = useState(true);
+  // Los pedidos a la sesión van en fila, en el orden en que se hicieron: así no se pierden ni se
+  // cruzan las teclas que se escriben rápido mientras un programa lee el teclado
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const [running, setRunning] = useState(0);
   const [pending, setPending] = useState<Pending | null>(null);
   const [status, setStatus] = useState('');
   // Un fallo del hilo del simulador llega al ErrorBoundary en lugar de dejar la línea bloqueada
@@ -68,7 +70,6 @@ export function App({ client, shared = null }: AppProps) {
       (next) => {
         if (!current) return;
         setView(next);
-        setBusy(false);
         if (shared) setPending({ kind: 'load', lines: shared, from: 'link' });
       },
       (error: unknown) => current && setFailure(error),
@@ -78,20 +79,19 @@ export function App({ client, shared = null }: AppProps) {
     };
   }, [client, shared]);
 
-  async function run(task: () => Promise<DebugView>) {
-    setBusy(true);
-    try {
-      setView(await task());
-    } catch (error) {
-      setFailure(error);
-    }
-    setBusy(false);
+  function run(task: () => Promise<DebugView>) {
+    setRunning((n) => n + 1);
+    queue.current = queue.current
+      .then(task)
+      .then(setView, setFailure)
+      .finally(() => setRunning((n) => n - 1));
   }
 
   function submit(line: string) {
     const store = useCommandLog.getState();
-    store.append(line);
-    return run(async () => {
+    // Las teclas que lee un programa se guardan para repetirlas, pero no van a las flechas
+    store.append(line, !view?.waiting);
+    run(async () => {
       const next = await client.submit(line);
       // Tras `q` solo hace falta guardar lo que venga después; las flechas conservan lo anterior
       if (next.restarted) store.restart();
@@ -113,7 +113,7 @@ export function App({ client, shared = null }: AppProps) {
 
   function load(lines: string[]) {
     useCommandLog.getState().load(lines);
-    return run(() => client.start(lines));
+    run(() => client.start(lines));
   }
 
   function confirm(confirmed: boolean) {
@@ -122,9 +122,9 @@ export function App({ client, shared = null }: AppProps) {
     if (!confirmed || !action) return;
     if (action.kind === 'reset') {
       useCommandLog.getState().clear();
-      void run(() => client.reset());
+      run(() => client.reset());
     } else {
-      void load(action.lines);
+      load(action.lines);
     }
   }
 
@@ -159,7 +159,7 @@ export function App({ client, shared = null }: AppProps) {
   }
 
   function open(lines: string[]) {
-    if (useCommandLog.getState().log.length === 0) void load(lines);
+    if (useCommandLog.getState().log.length === 0) load(lines);
     else setPending({ kind: 'load', lines, from: 'file' });
   }
 
@@ -173,7 +173,7 @@ export function App({ client, shared = null }: AppProps) {
       {/* Título de la página para lectores de pantalla y buscadores; la terminal ya lo deja claro a la vista */}
       <h1 className="sr-only">Simulador DEBUG 8086</h1>
       <StatePanel view={view} onMoveWindow={moveWindow} />
-      <Terminal lines={view.lines} prompt={view.prompt} history={history} busy={busy} onSubmit={submit}>
+      <Terminal lines={view.lines} prompt={view.prompt} history={history} busy={running > 0} waiting={view.waiting} onSubmit={submit}>
         <AppInfo className="info--float" />
         <Tools
           hasProgram={hasProgram}

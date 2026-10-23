@@ -15,7 +15,8 @@ interface CommandLogState {
   log: string[];
   /** Líneas no vacías para las flechas, sin cortar en `q`. */
   history: string[];
-  append: (line: string) => void;
+  /** `remember: false` para las teclas que lee un programa: se guardan, pero no van a las flechas. */
+  append: (line: string, remember?: boolean) => void;
   /** `q` dejó la máquina en el estado inicial: lo anterior ya no hace falta para reconstruirla. */
   restart: () => void;
   /** Un programa compartido o abierto de un archivo reemplaza la sesión; sus líneas se suman a las flechas. */
@@ -29,10 +30,10 @@ export const useCommandLog = create<CommandLogState>()(
     (set) => ({
       log: [],
       history: [],
-      append: (line) =>
+      append: (line, remember = true) =>
         set((s) => ({
           log: [...s.log, line],
-          history: line.trim() === '' ? s.history : [...s.history, line].slice(-MAX_HISTORY),
+          history: !remember || line.trim() === '' ? s.history : [...s.history, line].slice(-MAX_HISTORY),
         })),
       restart: () => set({ log: [] }),
       load: (lines) =>
