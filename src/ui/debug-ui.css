@@ -521,6 +521,35 @@ body {
   .tool { transition: background-color 120ms ease-out, color 120ms ease-out; }
 }
 
+/* ============================== COMANDOS RÁPIDOS (pantalla táctil) ============================== */
+.quick { display: none; }
+@media (pointer: coarse) {
+  .quick { flex-shrink: 0; display: flex; gap: 6px; padding: 0 12px 6px; }
+  .quick__cmd {
+    flex: 1 1 0;
+    height: 36px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--cell);
+    color: var(--cmd);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .quick__cmd:disabled { opacity: 0.4; }
+  .quick__cmd:focus-visible { outline: 2px solid var(--cmd); outline-offset: -2px; }
+  /* Las herramientas suben lo que ocupa la fila de comandos rápidos (36 px + 6 px) */
+  .tools { bottom: 94px; }
+}
+@media (pointer: coarse) and (min-width: 768px) {
+  .quick { padding: 0 16px 6px; }
+}
+@media (pointer: coarse) and (min-width: 1024px) {
+  /* Alineada con la línea de comandos, sin pasar por debajo del panel flotante */
+  .quick { padding: 0 calc(var(--panel-width) + var(--panel-inset) * 2) 6px 20px; }
+  .tools { bottom: 92px; }
+}
+
 /* Confirmaciones (Reiniciar, abrir un programa): <dialog> modal sobre un fondo oscurecido */
 .confirm {
   width: min(360px, calc(100vw - 32px));

@@ -260,3 +260,16 @@ describe('App: compartir, guardar y abrir', () => {
     expect(useCommandLog.getState().log).toEqual(['r bx', '5']);
   });
 });
+
+describe('App: comandos rápidos', () => {
+  it('t, p, g y r se envían con un toque, solo en el modo comando', async () => {
+    const { user, output, type } = await setup();
+    const quick = within(screen.getByRole('group', { name: 'Comandos rápidos' }));
+    expect(quick.getAllByRole('button').map((b) => b.textContent)).toEqual(['t', 'p', 'g', 'r']);
+    await user.click(quick.getByRole('button', { name: 'r' }));
+    expect(within(output()).getByText('-r')).toBeTruthy();
+
+    await type('a');
+    expect(quick.getByRole('button', { name: 't' })).toHaveProperty('disabled', true);
+  });
+});

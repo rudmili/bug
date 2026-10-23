@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactNode, SubmitEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, ReactNode, SubmitEvent } from 'react';
 import type { TerminalLine } from '../debug/types';
 import { TerminalHint } from './TerminalHint';
 import { announcement } from './announcement';
+
+/** Botones para la pantalla táctil: los comandos de ejecución, sin abrir el teclado. */
+const QUICK = ['t', 'p', 'g', 'r'];
 
 interface TerminalProps {
   lines: TerminalLine[];
@@ -53,8 +56,10 @@ export function Terminal({ lines, prompt, onSubmit, history, busy, children }: T
   }
 
   // Un clic en cualquier parte de la terminal lleva el foco al campo, salvo que se esté seleccionando texto
-  function focusInput() {
+  // o se haya tocado un botón (en el móvil, el foco en el campo abre el teclado)
+  function focusInput(event: MouseEvent<HTMLElement>) {
     if (window.getSelection()?.toString()) return;
+    if ((event.target as Element).closest('button, a, input, dialog')) return;
     inputRef.current?.focus();
   }
 
@@ -74,6 +79,14 @@ export function Terminal({ lines, prompt, onSubmit, history, busy, children }: T
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement(lines)}
       </p>
+      {/* Solo con pantalla táctil (ver .quick). Fuera del modo comando, una letra sería otra cosa */}
+      <div className="quick" role="group" aria-label="Comandos rápidos">
+        {QUICK.map((cmd) => (
+          <button key={cmd} type="button" className="quick__cmd" disabled={busy || prompt !== '-'} onClick={() => onSubmit(cmd)}>
+            {cmd}
+          </button>
+        ))}
+      </div>
       <form className="term__input-row" onSubmit={handleSubmit}>
         <label className="term__prompt" htmlFor="debug-cmd">
           {prompt}
